@@ -1,4 +1,4 @@
-import { BPS, formatQuote, INPUT_TO_QUOTE, parseDecimal, percent } from './decimal';
+import { QUOTE_DECIMALS, BPS, formatQuote, INPUT_TO_QUOTE, parseDecimal, percent } from './decimal';
 import {
   BOOK_MAX_AGE_MS,
   CLOCK_SKEW_MS,
@@ -7,6 +7,7 @@ import {
   MarketFailure,
   normalizeAsset,
   type MarketError,
+  REFERENCES,
   type Reference,
 } from './market';
 
@@ -39,6 +40,10 @@ export type ComparisonSettings = {
 
 export type UnavailableReason = MarketError | 'invalid-transaction' | 'stale-transaction' | 'fee-not-configured';
 
+export const AVERAGE = 'Moyenne des marchés';
+export const MARKET_SELECTIONS = [AVERAGE, ...REFERENCES] as const;
+export type MarketSelection = typeof MARKET_SELECTIONS[number];
+
 export type Comparison = {
   status: 'unavailable';
   reason: UnavailableReason;
@@ -47,7 +52,8 @@ export type Comparison = {
   status: 'good' | 'better';
   checkedAt: number;
   validUntil: number;
-  reference: Reference;
+  reference: MarketSelection;
+  marketCount?: number;
   referenceGross: string;
   referenceFee: string;
   referenceTotal: string;
@@ -154,4 +160,36 @@ export async function compareTransaction(
   } catch (error) {
     return unavailable(error instanceof MarketFailure ? error.reason : 'network-error');
   }
+}
+
+export async function compareAverage(
+  transaction: Transaction, settings: ComparisonSettings, dependencies: Dependencies = {},
+): Promise<Comparison> {
+  const now = dependencies.now ?? Date.now;
+  const results = await Promise.all(REFERENCES.map(reference =>
+    compareTransaction(transaction, { ...settings, reference }, dependencies)));
+  const valid = results.filter(result => result.status !== 'unavailable').filter(result => result.validUntil > now());
+  if (valid.length < 2) {
+    const failed = results.find(result => result.status === 'unavailable');
+    return { status: 'unavailable', reason: failed?.reason ?? 'market-unavailable', checkedAt: now() };
+  }
+  const total = parseDecimal(transaction.total)! * INPUT_TO_QUOTE;
+  const count = BigInt(valid.length);
+  function mean(key: 'referenceGross' | 'referenceFee' | 'referenceTotal') {
+    return valid.reduce((sum, market) => {
+      const [whole, fraction = ''] = market[key].split('.');
+      return sum + BigInt(whole + fraction.padEnd(QUOTE_DECIMALS, '0'));
+    }, 0n) / count;
+  }
+  const reference = mean('referenceTotal');
+  const delta = transaction.side === 'buy' ? total - reference : reference - total;
+  const savings = delta > 0n ? delta : 0n;
+  return {
+    status: savings * BPS > total * BigInt(COMPARISON_THRESHOLD_BPS) ? 'better' : 'good',
+    checkedAt: now(), validUntil: Math.min(...valid.map(result => result.validUntil)),
+    reference: AVERAGE, marketCount: valid.length, referenceGross: formatQuote(mean('referenceGross')),
+    referenceFee: formatQuote(mean('referenceFee')), referenceTotal: formatQuote(reference),
+    feeBps: 0, feeEstimated: true, savings: formatQuote(savings), gapPct: percent(delta, total),
+    spreadPct: 0, slippagePct: 0,
+  };
 }

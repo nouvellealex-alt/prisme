@@ -8,11 +8,12 @@ Prisme est une extension Chrome qui répond à une question simple avant un acha
 
 ```mermaid
 flowchart TD
-    A["Devis d’achat ou de vente"] --> B["Lecture Kraken ou saisie manuelle"]
+    A["Devis d’achat ou de vente"] --> B["Lecture du récapitulatif ou saisie manuelle"]
     B --> C{"Comparer avec"}
     C -->|Kraken Pro| F["Même paire, même quantité, frais estimés"]
     C -->|Binance Spot| F
     C -->|Coinbase Exchange| F
+    C -->|Moyenne| F
     F --> G{"Données suffisantes ?"}
     G -->|Oui| H["Total de référence et écart estimés"]
     G -->|Non| I["Comparaison indisponible"]
@@ -32,9 +33,11 @@ Saisissez le total à payer pour un achat ou le montant net à recevoir pour une
 | Source du devis | Mode |
 | --- | --- |
 | Kraken et Kraken Pro | Lecture automatique des récapitulatifs reconnus ou saisie manuelle |
-| Binance, Coinbase et autres plateformes | Saisie manuelle du total final |
+| Tout autre site HTTPS | Détection activable par site sur les récapitulatifs reconnus, ou saisie manuelle |
 
-Les références disponibles sont Kraken Pro, Binance Spot et Coinbase Exchange. Pour les deux références externes, le moteur limite les actifs de base à BTC, ETH et SOL. La paire exacte doit exister chez le concurrent.
+Sur un autre site, ouvrez Prisme, cliquez sur **Activer sur ce site** et accordez l’accès au site affiché. La fenêtre de comparaison apparaît à côté des récapitulatifs reconnus lorsqu’elle peut s’afficher sans masquer les commandes. Vous pouvez retirer l’accès depuis les paramètres de l’extension dans Chrome.
+
+Les références disponibles sont Kraken Pro, Binance Spot et Coinbase Exchange. La moyenne arithmétique utilise au moins deux références valides, frais compris. Vert indique un devis compétitif face à la référence choisie. Rouge indique un écart en faveur de la référence supérieur à 0,25 %. Gris indique que la comparaison est indisponible. Pour les deux références externes, le moteur limite les actifs de base à BTC, ETH et SOL. La paire exacte doit exister chez le concurrent.
 
 **Bon prix** signifie que le prix proposé est au moins aussi favorable que la référence ou reste proche du total de référence après frais. Une économie éventuelle est une estimation calculée à partir du carnet, susceptible d’évoluer avant exécution. La référence indique une seule plateforme et dépend de l’accès au marché et aux fonds dans la devise affichée.
 
@@ -61,7 +64,7 @@ pnpm test:e2e
 
 Les préférences sont stockées dans Chrome. Les devis restent en mémoire pendant le calcul et ne sont pas enregistrés. Les seules requêtes de marché sont des lectures HTTPS de catalogues et de carnets publics. Elles indiquent la paire, sans la quantité, le montant, le sens de l’ordre ni d’identifiant de compte. Prisme ne possède aucun accès de trading ou de portefeuille.
 
-Le détecteur couvre des récapitulatifs explicites. Les variantes authentifiées de Kraken et Kraken Pro peuvent changer et n’ont pas toutes pu être vérifiées sur un compte réel. Le mode manuel couvre les devis que Prisme ne sait pas lire. Le MVP écarte les conversions entre actifs volatils, les ordres à cours limité, le levier et les produits dérivés. Il ne chiffre pas les frais de financement, de transfert, de retrait ou de change nécessaires pour déplacer des fonds vers la référence. Consultez la [méthode et les limites](docs/method.md) avant d’interpréter un écart.
+Le détecteur générique reconnaît certains récapitulatifs d’achat ou de vente en français ou en anglais. Il exige des montants cohérents et explicites. Les fenêtres de signature de wallets et les récapitulatifs dans des iframes restent hors périmètre. Les variantes authentifiées de Kraken et Kraken Pro peuvent changer et n’ont pas toutes pu être vérifiées sur un compte réel. Le mode manuel couvre les devis que Prisme ne sait pas lire. Le MVP écarte les conversions entre actifs volatils, les ordres à cours limité, le levier et les produits dérivés. Il ne chiffre pas les frais de financement, de transfert, de retrait ou de change nécessaires pour déplacer des fonds vers la référence. Consultez la [méthode et les limites](docs/method.md) avant d’interpréter un écart.
 
 ## Feuille de route
 

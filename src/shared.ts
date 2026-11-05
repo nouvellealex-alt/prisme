@@ -1,4 +1,4 @@
-import { isFeeBps, REFERENCES, type ComparisonSettings, type Reference, type Comparison, type Transaction } from './engine';
+import { isFeeBps, REFERENCES, type ComparisonSettings, type MarketSelection, type Comparison, type Transaction } from './engine';
 
 export type Platform = Transaction['platform'];
 export type Theme = 'auto' | 'light' | 'dark';
@@ -18,8 +18,9 @@ export interface PopupState {
 }
 
 export type PopupRequest =
-  | { type: 'PRISME_GET_STATE'; reference?: Reference }
-  | { type: 'PRISME_COMPARE_MANUAL'; transaction: Transaction; reference?: Reference }
+  | { type: 'PRISME_GET_STATE'; reference?: MarketSelection }
+  | { type: 'PRISME_COMPARE_MANUAL'; transaction: Transaction; reference?: MarketSelection }
+  | { type: 'PRISME_ENABLE_SITE'; origin: string }
   | { type: 'PRISME_GET_SETTINGS' }
   | { type: 'PRISME_SAVE_SETTINGS'; settings: Settings };
 

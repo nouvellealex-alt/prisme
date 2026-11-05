@@ -16,6 +16,7 @@
   --warn: #885000;
   --warn-tint: #fff3dd;
   --error: #b30021;
+  --error-tint: #fff0f1;
   --solid: #1d1d1f;
   --on-solid: #fff;
   --focus: #007aff;
@@ -36,6 +37,7 @@
     --warn: #ffd08b;
     --warn-tint: #362818;
     --error: #ff96a2;
+  --error-tint: #3a2028;
     --solid: #f5f5f7;
     --on-solid: #171719;
     --focus: #8ebfff;
@@ -57,6 +59,7 @@
   --warn: #ffd08b;
   --warn-tint: #362818;
   --error: #ff96a2;
+  --error-tint: #3a2028;
   --solid: #f5f5f7;
   --on-solid: #171719;
   --focus: #8ebfff;
@@ -132,7 +135,7 @@ h1, h2, p, dl, dd { margin: 0; }
   animation: appear 180ms ease-out both;
 }
 .verdict[data-tone="good"] { background: var(--good-tint); }
-.verdict[data-tone="better"] { background: var(--blue-tint); }
+.verdict[data-tone="better"] { background: var(--error-tint); }
 .verdict[data-tone="warn"] { background: var(--warn-tint); }
 .verdict-label {
   display: inline-flex;
@@ -143,7 +146,7 @@ h1, h2, p, dl, dd { margin: 0; }
   font-weight: 650;
 }
 .verdict[data-tone="good"] .verdict-label { color: var(--good); }
-.verdict[data-tone="better"] .verdict-label { color: var(--accent); }
+.verdict[data-tone="better"] .verdict-label { color: var(--error); }
 .verdict[data-tone="warn"] .verdict-label { color: var(--warn); }
 .verdict h1 {
   max-width: 100%;

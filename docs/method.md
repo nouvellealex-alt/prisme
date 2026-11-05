@@ -8,6 +8,8 @@ Pour un achat, Prisme consomme les offres de vente de la moins chère à la plus
 
 À l’achat, l’économie possible est le total du devis moins le coût de référence. À la vente, c’est le produit net de référence moins le produit net du devis. Le seuil d’affichage d’une meilleure offre est de 0,25 % du total du devis. Une différence inférieure ou égale au seuil, ou un devis déjà plus favorable que la référence, donne **Bon prix**. Le calcul utilise des décimales avant l’arrondi d’affichage.
 
+La moyenne est arithmétique et porte sur les totaux frais compris des marchés qui ont fourni une estimation valide, avec un minimum de deux marchés. Elle expire à la date d’expiration la plus proche parmi les références retenues.
+
 ## Garde-fous
 
 - Même actif de base, même devise et même quantité. Aucune conversion entre devises ni entre stablecoins.
@@ -29,6 +31,6 @@ La référence modélise une exécution immédiate à partir d’un snapshot pub
 
 ## Détection et permissions Chrome
 
-Le script isolé s’exécute uniquement sur `app.kraken.com` et `pro.kraken.com`. Il lit le texte visible du récapitulatif lorsqu’un contexte d’achat ou de vente et des champs explicites permettent d’identifier une transaction comparable. Les pages de connexion, portefeuilles et historiques ne servent pas de sources. Le badge s’affiche uniquement lorsqu’il existe un emplacement libre. Il peut être masqué dans les paramètres.
+Le script isolé est actif par défaut sur `app.kraken.com` et `pro.kraken.com`. Sur un autre site HTTPS, Prisme demande l’accès à l’origine sélectionnée par l’utilisateur et lit uniquement le document principal. Les demandes de signature de wallet restent hors périmètre. Il lit le texte visible du récapitulatif lorsqu’un contexte d’achat ou de vente et des champs explicites permettent d’identifier une transaction comparable. Les pages de connexion, portefeuilles et historiques ne servent pas de sources. Le badge s’affiche uniquement lorsqu’il existe un emplacement libre. Il peut être masqué dans les paramètres.
 
 `storage` sert aux préférences locales. Les permissions d’hôte réseau couvrent `api.kraken.com`, `data-api.binance.vision` et `api.exchange.coinbase.com`. Le service worker fait des requêtes publiques en lecture seule, sans cookies ni clés. Aucun serveur Prisme n’est nécessaire. [Scripts de contenu Chrome](https://developer.chrome.com/docs/extensions/reference/manifest/content-scripts) · [Requêtes réseau Chrome](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests).

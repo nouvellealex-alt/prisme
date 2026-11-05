@@ -1,7 +1,5 @@
-import type { Comparison, Transaction } from '../engine'
+import { MARKET_SELECTIONS, type MarketSelection, type Comparison, type Transaction } from '../engine'
 import type { Theme } from '../shared'
-
-type Success = Exclude<Comparison, { status: 'unavailable' }>
 
 const ACTIONS = 'button, a[href], input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
 const EDGE = 14
@@ -32,6 +30,12 @@ const style = `
   .label { display: grid; gap: 1px; overflow-wrap: anywhere; }
   .title { font-weight: 650; }
   .caption { font-size: 11px; color: var(--secondary); }
+  :host([data-verdict="better"]) .title, :host([data-verdict="better"]) .mark { color: #b42437; }
+  :host([data-verdict="good"]) .title { color: var(--tint); }
+  :host([data-verdict="unavailable"]) .mark { color: var(--secondary); }
+  :host([data-theme="dark"][data-verdict="better"]) .title, :host([data-theme="dark"][data-verdict="better"]) .mark { color: #ff9bab; }
+  @media (prefers-color-scheme: dark) { :host([data-theme="auto"][data-verdict="better"]) .title, :host([data-theme="auto"][data-verdict="better"]) .mark { color: #ff9bab; } }
+  select { pointer-events: auto; color: inherit; background: var(--surface); font: inherit; max-width: 100%; }
   .mark { color: var(--tint); font-size: 16px; }
   button {
     flex: none; pointer-events: auto; display: grid; place-items: center; inline-size: 44px;
@@ -59,10 +63,12 @@ function overlaps(x: number, y: number, width: number, height: number, rect: DOM
 }
 
 export function createBadge(
-  comparison: Success, transaction: Transaction, theme: Theme, dismiss: () => void,
+  comparison: Comparison, transaction: Transaction, theme: Theme, dismiss: () => void,
+  selected: MarketSelection, onSelect: (reference: MarketSelection) => void,
 ) {
   const host = document.createElement('prisme-price-badge')
   host.dataset.theme = theme
+  host.dataset.verdict = comparison.status
   host.style.visibility = 'hidden'
   const shadow = host.attachShadow({ mode: 'closed' })
   const css = document.createElement('style')
@@ -72,24 +78,33 @@ export function createBadge(
   const mark = document.createElement('span')
   mark.className = 'mark'
   mark.setAttribute('aria-hidden', 'true')
-  mark.textContent = comparison.status === 'good' ? '✓' : '↗'
+  mark.textContent = comparison.status === 'good' ? '✓' : comparison.status === 'better' ? '!' : '–'
   const label = document.createElement('span')
   label.className = 'label'
   label.setAttribute('role', 'status')
   const title = document.createElement('span')
   title.className = 'title'
-  title.textContent = comparison.status === 'good' ? 'Prix compétitif' :
+  title.textContent = comparison.status === 'unavailable' ? 'Comparaison indisponible' : comparison.status === 'good' ? 'Devis compétitif' :
     transaction.side === 'buy' ? `Économie estimée · ${amount(comparison.savings, transaction.quote)}` :
       `Gain estimé · ${amount(comparison.savings, transaction.quote)}`
   const caption = document.createElement('span')
   caption.className = 'caption'
-  caption.textContent = `Prisme · Réf. ${comparison.reference}`
+  caption.textContent = comparison.status === 'unavailable' ? 'Vérifiez la paire et les frais dans Prisme.' :
+    `Devis ${amount(transaction.total, transaction.quote)} · ${comparison.marketCount ? `Moy. (${comparison.marketCount})` : 'Réf.'} ${amount(comparison.referenceTotal, transaction.quote)}`
+  const select = document.createElement('select')
+  select.setAttribute('aria-label', 'Marché de référence Prisme')
+  for (const name of MARKET_SELECTIONS) select.add(new Option(name, name))
+  select.value = selected
+  select.addEventListener('change', () => {
+    const next = MARKET_SELECTIONS.find(name => name === select.value)
+    if (next) onSelect(next)
+  })
   const close = document.createElement('button')
   close.type = 'button'
   close.textContent = '×'
   close.setAttribute('aria-label', 'Fermer la notification Prisme')
   close.addEventListener('click', dismiss)
-  label.append(title, caption)
+  label.append(title, caption, select)
   card.append(mark, label, close)
   shadow.append(css, card)
   document.body.append(host)

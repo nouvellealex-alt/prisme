@@ -1,13 +1,17 @@
-import { TRANSACTION_MAX_AGE_MS, type Comparison, type Transaction } from '../engine'
+import { AVERAGE, TRANSACTION_MAX_AGE_MS, type MarketSelection, type Comparison, type Transaction } from '../engine'
 import { DEFAULT_SETTINGS, getSettings, parseSettings, platformFromUrl, STORAGE_KEY } from '../shared'
 import { createBadge } from './badge'
 import { detectQuote } from './detect'
 
 const CHECK_INTERVAL_MS = 500
 const STABLE_MS = 650
-const platform = platformFromUrl(location.href)
+const platform = platformFromUrl(location.href) ?? 'other'
+const page = globalThis as typeof globalThis & { prismeMonitoring?: boolean }
 
-if (platform && window.top === window) monitor(platform)
+if (!page.prismeMonitoring && window.top === window) {
+  page.prismeMonitoring = true
+  monitor(platform)
+}
 
 function monitor(platform: Transaction['platform']) {
   let settings = { ...DEFAULT_SETTINGS, inlineEnabled: false }
@@ -15,6 +19,8 @@ function monitor(platform: Transaction['platform']) {
   let badge: ReturnType<typeof createBadge> | null = null
   let validUntil = 0
   let checkedKey = ''
+  let reference: MarketSelection | undefined
+  let selectionRevision = 0
   let dismissed = false
   let expiryTimer: number | undefined
   let interval: number | undefined
@@ -78,20 +84,31 @@ function monitor(platform: Transaction['platform']) {
     checkedKey = checkKey
     const revision = storageRevision
     const visibility = visibilityRevision
+    const selection = selectionRevision
+    const configured = [settings.krakenTakerBps, settings.binanceTakerBps, settings.coinbaseTakerBps]
+      .filter(fee => fee !== undefined).length
+    const selected = reference ?? (platform === 'other' || configured >= 2 ? AVERAGE : settings.reference)
 
-    void chrome.runtime.sendMessage({ type: 'PRISME_COMPARE_TRANSACTION', transaction })
+    void chrome.runtime.sendMessage({ type: 'PRISME_COMPARE_TRANSACTION', transaction, reference: selected })
       .then((comparison: Comparison | null | undefined) => {
-        if (!comparison || comparison.status === 'unavailable' || revision !== storageRevision || visibility !== visibilityRevision ||
+        if (!comparison || selection !== selectionRevision || revision !== storageRevision || visibility !== visibilityRevision ||
             !settings.inlineEnabled || dismissed || document.visibilityState !== 'visible') return
         const current = scan()
-        if (current?.transaction !== transaction || comparison.validUntil <= Date.now()) return
+        if (current?.transaction !== transaction || (comparison.status !== 'unavailable' && comparison.validUntil <= Date.now())) return
+        clearBadge()
 
         badge = createBadge(comparison, transaction, settings.theme, () => {
           dismissed = true
           clearBadge()
+        }, selected ?? 'Kraken Pro', next => {
+          reference = next
+          selectionRevision += 1
+          checkedKey = ''
+          clearBadge()
+          check()
         })
         badge.position(current.surface)
-        validUntil = comparison.validUntil
+        validUntil = comparison.status === 'unavailable' ? transaction.observedAt + TRANSACTION_MAX_AGE_MS : comparison.validUntil
         expiryTimer = window.setTimeout(clearBadge, Math.max(0, validUntil - Date.now()))
       }).catch(() => {
         // Chrome invalidates old content scripts when the unpacked extension is reloaded.

@@ -6,7 +6,7 @@ Prisme is a Chrome extension that checks whether a crypto buy or sell quote is c
 
 ## Install in Chrome
 
-1. Extract `prisme-chrome-v1.2.1.zip`, or build from source as shown below.
+1. Extract `prisme-chrome-v1.3.0.zip`, or build from source as shown below.
 2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
 3. Select the folder containing `manifest.json`. Select `dist/` when using a local build.
 4. Open Prisme and enter the applicable market-order fee for the reference venue under **Paramètres**. Enter the percentage for your account and pair.
@@ -18,9 +18,9 @@ Open Prisme on a spot buy or sell review screen. It attempts to read the exact q
 | Quote source | Input |
 | --- | --- |
 | Kraken and Kraken Pro | Recognized quote review layouts or manual entry |
-| Binance, Coinbase and other platforms | Manual all-in quote entry |
+| Other HTTPS sites | Optional site-by-site review detection or manual all-in quote entry |
 
-Choose Kraken Pro, Binance Spot or Coinbase Exchange under **Comparer avec**. The external references support BTC, ETH and SOL as base assets, subject to exact pair availability. Configure your applicable taker fee for each reference under **Paramètres**.
+Choose Kraken Pro, Binance Spot or Coinbase Exchange under **Comparer avec**. Choose the mean of available markets to average fee-inclusive totals from at least two valid books. For a new site, choose **Activer sur ce site** in the popup and grant access to that site. Generic detection requires an explicit English or French quote review. Wallet signature prompts and iframes are outside its scope. The external references support BTC, ETH and SOL as base assets, subject to exact pair availability. Configure your applicable taker fee for each reference under **Paramètres**.
 
 **Bon prix** means the quoted amount is close to or more favorable than the reference after fees. Any potential saving is an estimate from a snapshot of the order book and can change before execution. It describes one reference market and assumes that you can access it and have the necessary funds in the quoted currency.
 

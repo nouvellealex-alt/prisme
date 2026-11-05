@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { compareTransaction, TRANSACTION_MAX_AGE_MS, type Transaction } from './index';
+import { AVERAGE, compareAverage, compareTransaction, TRANSACTION_MAX_AGE_MS, type Transaction } from './index';
 
 const now = Date.UTC(2026, 10, 5, 20, 30, 0);
 const source: Transaction = {
@@ -169,4 +169,23 @@ describe('compareTransaction', () => {
     await expect(compareTransaction(source, { krakenTakerBps: 80 }, { fetch, now: () => now }))
       .resolves.toMatchObject({ status: 'unavailable', reason: 'network-error' });
   });
+});
+
+it('averages valid all-in totals and requires two independent markets', async () => {
+  const kraken = krakenResponses();
+  const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+    if (String(url).includes('kraken.com')) return kraken(url, init);
+    if (String(url).endsWith('level=2')) return Response.json({
+      time: new Date(now).toISOString(), bids: [['97', '5']], asks: [['99', '5']],
+    });
+    return Response.json({
+      id: 'BTC-EUR', base_currency: 'BTC', quote_currency: 'EUR', status: 'online',
+      post_only: false, limit_only: false, cancel_only: false, auction_mode: false,
+      min_market_funds: '1', base_increment: '0.00000001', max_slippage_percentage: '0.05',
+    });
+  });
+  const result = await compareAverage(source, { krakenTakerBps: 80, coinbaseTakerBps: 100 }, { fetch, now: () => now });
+  expect(result).toMatchObject({ reference: AVERAGE, marketCount: 2, referenceTotal: '100.395' });
+  const single = await compareAverage(source, { krakenTakerBps: 80 }, { fetch: krakenResponses(), now: () => now });
+  expect(single.status).toBe('unavailable');
 });

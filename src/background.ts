@@ -1,15 +1,16 @@
-import { compareTransaction, isTransaction, REFERENCES, type Reference, type Comparison, type Transaction } from './engine';
+import { AVERAGE, compareAverage, compareTransaction, isTransaction, REFERENCES, type MarketSelection, type Comparison, type Transaction } from './engine';
 import { getSettings, parseSettings, platformFromUrl, STORAGE_KEY, type PopupRequest, type PopupState } from './shared';
 
-type ComparePageRequest = { type: 'PRISME_COMPARE_TRANSACTION'; transaction: Transaction };
+type ComparePageRequest = { type: 'PRISME_COMPARE_TRANSACTION'; transaction: Transaction; reference?: MarketSelection };
 
-async function compare(transaction: Transaction, reference?: Reference): Promise<Comparison> {
+async function compare(transaction: Transaction, reference?: MarketSelection): Promise<Comparison> {
   const settings = await getSettings();
+  if (reference === AVERAGE) return compareAverage(transaction, settings);
   if (reference && REFERENCES.includes(reference)) settings.reference = reference;
   return compareTransaction(transaction, settings);
 }
 
-async function currentState(reference?: Reference): Promise<PopupState> {
+async function currentState(reference?: MarketSelection): Promise<PopupState> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const platform = platformFromUrl(tab?.url);
   if (tab?.id === undefined) return { platform, transaction: null, comparison: null };
@@ -40,6 +41,7 @@ async function handlePopup(message: PopupRequest): Promise<unknown> {
   switch (message.type) {
     case 'PRISME_GET_STATE': return currentState(message.reference);
     case 'PRISME_COMPARE_MANUAL': return compare(message.transaction, message.reference);
+    case 'PRISME_ENABLE_SITE': return enableSite(message.origin);
     case 'PRISME_GET_SETTINGS': return getSettings();
     case 'PRISME_SAVE_SETTINGS': {
       const settings = parseSettings(message.settings);
@@ -55,9 +57,8 @@ chrome.runtime.onMessage.addListener((message: PopupRequest | ComparePageRequest
 
   let result: Promise<unknown>;
   if (message.type === 'PRISME_COMPARE_TRANSACTION') {
-    const platform = platformFromUrl(sender.url);
-    if (!platform || sender.frameId !== 0 || message.transaction?.platform !== platform) return;
-    result = compare(message.transaction);
+    if (sender.frameId !== 0 || !sender.url || !sender.tab) return;
+    result = comparePage(sender.url, message);
   } else {
     if (sender.url !== chrome.runtime.getURL('popup.html')) return;
     result = handlePopup(message);
@@ -65,3 +66,26 @@ chrome.runtime.onMessage.addListener((message: PopupRequest | ComparePageRequest
   void result.then(sendResponse, () => sendResponse(null));
   return true;
 });
+
+async function comparePage(url: string, message: ComparePageRequest) {
+  const platform = platformFromUrl(url);
+  if (platform) return message.transaction?.platform === platform ? compare(message.transaction, message.reference) : null;
+  const origin = new URL(url).origin;
+  if (!origin.startsWith('https://') || !await chrome.permissions.contains({ origins: [origin + '/*'] })) return null;
+  if (message.transaction?.platform !== 'other') return null;
+  return compare(message.transaction, message.reference);
+}
+
+async function enableSite(origin: string) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id === undefined || !tab.url || !origin.startsWith('https://') || new URL(tab.url).origin !== origin) return false;
+  const match = origin + '/*';
+  if (!await chrome.permissions.contains({ origins: [match] })) return false;
+  if (platformFromUrl(tab.url)) return true;
+  const id = 'prisme-' + Array.from(origin, char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+  if (!(await chrome.scripting.getRegisteredContentScripts({ ids: [id] })).length) {
+    await chrome.scripting.registerContentScripts([{ id, matches: [match], js: ['content.js'], runAt: 'document_idle' }]);
+  }
+  await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+  return true;
+}

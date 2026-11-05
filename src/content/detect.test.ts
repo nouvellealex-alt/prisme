@@ -111,3 +111,25 @@ describe('Kraken Pro immediate spot market order', () => {
     expect(detectQuote(page(html), 'kraken-pro')).toBeNull()
   })
 })
+
+describe('opt-in review on an unknown exchange', () => {
+  const review = `<div role="dialog" aria-label="Review purchase">
+    <dl><dt>Amount</dt><dd>0.01200000 BTC</dd><dt>Unit price</dt><dd>100,000.00 EUR</dd>
+    <dt>Fees</dt><dd>12.50 EUR</dd><dt>Total including fees</dt><dd>1,212.50 EUR</dd></dl>
+    <button>Confirm purchase</button></div>`
+
+  it('reads an explicit, internally consistent all-in quote', () => {
+    expect(detectQuote(page(review), 'other')?.quote).toEqual({
+      platform: 'other', side: 'buy', base: 'BTC', quote: 'EUR', quantity: '0.012',
+      total: '1212.5', fee: '12.5',
+    })
+  })
+
+  it('rejects signing prompts, missing fees, and inconsistent totals', () => {
+    for (const html of [review.replace('Review purchase', 'Sign transaction'),
+      review.replace('<dt>Fees</dt><dd>12.50 EUR</dd>', ''),
+      review.replace('1,212.50 EUR', '1,900.00 EUR')]) {
+      expect(detectQuote(page(html), 'other')).toBeNull()
+    }
+  })
+})

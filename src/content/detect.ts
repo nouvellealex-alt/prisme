@@ -248,10 +248,46 @@ function parsePro(surface: Element, action: RegExpExecArray, lang: string, isVis
   }
 }
 
+const BUY_REVIEW = /^(?:confirm purchase|review purchase|review buy|confirm buy|confirmer l['’]achat|recapitulatif de l['’]achat)$/u
+const SELL_REVIEW = /^(?:confirm sale|review sale|review sell|confirm sell|confirmer la vente|recapitulatif de la vente)$/u
+const REVIEW_ACTION = /^(?:confirm|confirm purchase|confirm buy|confirm sale|confirm sell|confirmer|confirmer l['’]achat|confirmer la vente)$/u
+const QUOTE_CURRENCIES = new Set([...CASH, 'USDT', 'USDC'])
+
+function genericReview(document: Document, lang: string, isVisible: IsVisible): DetectedQuote | null {
+  let candidate: DetectedQuote | null = null
+  for (const surface of document.querySelectorAll(DIALOGS)) {
+    if (!isVisible(surface) || surface.querySelectorAll(LABELS).length > 140) continue
+    const titles = [surface.getAttribute('aria-label') ?? '',
+      ...Array.from(surface.querySelectorAll('h1, h2, h3, [role="heading"]'))
+        .filter(isVisible).map(node => textOf(node, isVisible))].map(labelKey)
+    const buy = titles.some(title => BUY_REVIEW.test(title))
+    const sell = titles.some(title => SELL_REVIEW.test(title))
+    if (buy === sell || labeled(surface, EXCLUDED, isVisible).length) continue
+    if (!Array.from(surface.querySelectorAll(BUTTONS)).some(button =>
+      REVIEW_ACTION.test(labelKey(button.textContent ?? '')) && visibleAction(button, isVisible))) continue
+
+    const quantity = row(surface, buy ? AMOUNT : SELL_AMOUNT, value => monetary(value, lang), isVisible)
+    const total = row(surface, buy ? ALL_IN_BUY : ALL_IN_SELL, value => monetary(value, lang), isVisible)
+    if (!quantity || !total || !QUOTE_CURRENCIES.has(total.code) || QUOTE_CURRENCIES.has(quantity.code)
+      || quantity.amount === '0' || total.amount === '0') continue
+    const fee = row(surface, FEE, value => monetary(value, lang, total.code), isVisible)
+    const price = row(surface, /^(?:price|unit price|prix|prix unitaire)$/u, value => monetary(value, lang, total.code), isVisible)
+    if (!fee || !price) continue
+    const gross = parseDecimal(total.amount)! + (buy ? -1n : 1n) * parseDecimal(fee.amount)!
+    const rounding = (displayUnit(total) + displayUnit(fee)) * INPUT_TO_QUOTE
+    if (!consistentSubtotal(quantity, price, gross * INPUT_TO_QUOTE, rounding)) continue
+    if (candidate) return null
+    candidate = { surface, quote: { platform: 'other', side: buy ? 'buy' : 'sell',
+      base: quantity.code, quote: total.code, quantity: quantity.amount, total: total.amount, fee: fee.amount } }
+  }
+  return candidate
+}
+
 export function detectQuote(document: Document, platform: Platform): DetectedQuote | null {
   const lang = document.documentElement.lang.toLowerCase().split('-')[0] || 'en'
   if (lang !== 'fr' && lang !== 'en') return null
   const isVisible = visibility()
+  if (platform === 'other') return genericReview(document, lang, isVisible)
   let candidate: DetectedQuote | null = null
   for (const button of document.querySelectorAll(BUTTONS)) {
     const actionText = clean(button.textContent ?? '')

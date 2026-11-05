@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { REFERENCES, type Comparison, type Reference, type Transaction } from '../engine';
-import { DEFAULT_SETTINGS, request } from '../shared';
+import { MARKET_SELECTIONS, type Comparison, type MarketSelection, type Transaction } from '../engine';
+import { DEFAULT_SETTINGS, platformFromUrl, request } from '../shared';
 import type { PopupState, Settings } from '../shared';
 import { ManualForm, SettingsForm } from './Forms';
 import { Icon } from './Icon';
@@ -80,7 +80,7 @@ function Verdict({
       <h1 className="amount" aria-label={savingLabel + ' de ' + money(comparison.savings, transaction.quote)}>
         {money(comparison.savings, transaction.quote)}
       </h1>
-      <p>Une offre comparable semble plus avantageuse, frais estimés inclus.</p>
+      <p>Le devis est moins avantageux que la référence, frais estimés inclus.</p>
     </section>;
   }
 
@@ -96,7 +96,7 @@ function Verdict({
       ? 'Le dernier calcul a expiré. Vérifiez à nouveau votre devis.'
       : comparison?.status === 'unavailable'
         ? unavailableMessages[comparison.reason]
-        : 'Ouvrez le récapitulatif d’une transaction Kraken ou saisissez votre devis.';
+        : 'Ouvrez un récapitulatif reconnu, activez la détection sur le site ou saisissez votre devis.';
   return <section className="verdict" data-tone={expired ? 'warn' : undefined} role="status">
     <div className="verdict-label"><Icon name="scan" size={16} /> {expired ? 'Données expirées' : 'Vérification requise'}</div>
     <h1>Comparaison indisponible</h1>
@@ -117,15 +117,15 @@ function Details({ comparison, transaction, expired }: {
       <Metric label="Quantité comparée">{formatDecimal(number, transaction.quantity)} {transaction.base}</Metric>
       <Metric label={'Devis · ' + totalLabel}>{money(transaction.total, quote)}</Metric>
       <Metric label="Frais du devis inclus">{transaction.fee === undefined ? 'Montant inconnu' : money(transaction.fee, quote)}</Metric>
-      <Metric label="Marché de référence">{comparison.reference}</Metric>
+      <Metric label="Marché de référence">{comparison.reference}{comparison.marketCount ? ` (${comparison.marketCount})` : ''}</Metric>
       <Metric label="Montant au carnet">{money(comparison.referenceGross, quote)}</Metric>
-      <Metric label={'Frais estimés · ' + ratio(comparison.feeBps / 100)}>{money(comparison.referenceFee, quote)}</Metric>
+      <Metric label={'Frais estimés · ' + (comparison.marketCount ? 'moyenne' : ratio(comparison.feeBps / 100))}>{money(comparison.referenceFee, quote)}</Metric>
       <Metric label={'Référence · ' + totalLabel}>{money(comparison.referenceTotal, quote)}</Metric>
       {comparison.status === 'better' && <Metric label={transaction.side === 'buy' ? 'Économie possible' : 'Gain possible'}>
         {money(comparison.savings, quote)} ({ratio(comparison.gapPct)})
       </Metric>}
-      <Metric label="Écart entre achat et vente">{ratio(comparison.spreadPct)}</Metric>
-      <Metric label="Effet de la profondeur">{ratio(comparison.slippagePct)}</Metric>
+      {!comparison.marketCount && <><Metric label="Écart entre achat et vente">{ratio(comparison.spreadPct)}</Metric>
+      <Metric label="Effet de la profondeur">{ratio(comparison.slippagePct)}</Metric></>}
     </dl>
     <p>La référence suppose un ordre au marché et des fonds déjà disponibles dans la bonne devise. Elle inclut les frais de marché saisis dans les paramètres. Les conversions, transferts et retraits restent à votre charge.</p>
   </>;
@@ -135,7 +135,7 @@ function Method() {
   return <div className="method-list">
     <article><h2>Même transaction</h2><p>Prisme compare le total final du devis avec le prix d’un ordre au marché de même sens, quantité et paire. Les deux totaux utilisent la même devise.</p></article>
     <article><h2>Prix disponible au carnet</h2><p>Le calcul parcourt les niveaux d’achat ou de vente jusqu’à couvrir la quantité. Les frais estimés sont ajoutés à un achat et déduits d’une vente.</p></article>
-    <article><h2>Sources de référence</h2><p>Sélectionnez Kraken Pro, Binance Spot ou Coinbase Exchange. La disponibilité dépend de la paire. Les frais de référence sont estimés selon le taux saisi.</p></article>
+    <article><h2>Sources de référence</h2><p>Sélectionnez Kraken Pro, Binance Spot, Coinbase Exchange ou la moyenne des références valides. La disponibilité dépend de la paire. Les frais de référence sont estimés selon le taux saisi.</p></article>
     <article><h2>Fonds et coûts annexes</h2><p>Le calcul suppose des fonds disponibles dans la même devise sur les deux plateformes. Il exclut les conversions, les transferts et les retraits.</p></article>
   </div>;
 }
@@ -144,7 +144,9 @@ const initialState: PopupState = { platform: null, transaction: null, comparison
 export function Popup() {
   const [data, setData] = useState(initialState);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [selectedReference, setSelectedReference] = useState<Reference>();
+  const [selectedReference, setSelectedReference] = useState<MarketSelection>();
+  const [siteOrigin, setSiteOrigin] = useState<string>();
+  const [siteStatus, setSiteStatus] = useState('');
   const [settingsAvailable, setSettingsAvailable] = useState(false);
   const [view, setView] = useState<View>('home');
   const [source, setSource] = useState<'tab' | 'manual'>('tab');
@@ -155,7 +157,7 @@ export function Popup() {
   const focusPage = useRef(false);
   const requestVersion = useRef(0);
 
-  const refresh = useCallback(async (reference?: Reference) => {
+  const refresh = useCallback(async (reference?: MarketSelection) => {
     const version = ++requestVersion.current;
     setLoading(true);
     setError(false);
@@ -186,6 +188,11 @@ export function Popup() {
   useEffect(() => {
     void refresh();
     void loadSettings();
+    void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (!tab?.url || !tab.url.startsWith('https://')) return;
+      const origin = new URL(tab.url).origin;
+      if (!platformFromUrl(origin)) setSiteOrigin(origin);
+    }).catch(() => undefined);
   }, [refresh, loadSettings]);
 
   useEffect(() => {
@@ -236,6 +243,22 @@ export function Popup() {
     }
   }
 
+  async function activateSite() {
+    if (!siteOrigin) return;
+    setSiteStatus('Activation…');
+    try {
+      if (!await chrome.permissions.request({ origins: [siteOrigin + '/*'] })) {
+        setSiteStatus('Accès au site refusé.');
+        return;
+      }
+      const enabled = await request<boolean>({ type: 'PRISME_ENABLE_SITE', origin: siteOrigin });
+      setSiteStatus(enabled ? 'Détection activée sur ce site.' : 'Impossible d’activer ce site.');
+      if (enabled) void refresh(selectedReference);
+    } catch {
+      setSiteStatus('Impossible d’activer ce site.');
+    }
+  }
+
   async function saveSettings(next: Settings) {
     const saved = await request<Settings>({ type: 'PRISME_SAVE_SETTINGS', settings: next });
     setSettings(saved);
@@ -269,13 +292,13 @@ export function Popup() {
       <label className="field reference-picker">Comparer avec
         <select value={selectedReference ?? settings.reference ?? 'Kraken Pro'} disabled={loading}
           onChange={event => {
-            const reference = REFERENCES.find(value => value === event.currentTarget.value);
+            const reference = MARKET_SELECTIONS.find(value => value === event.currentTarget.value);
             if (!reference) return;
             setSelectedReference(reference);
             if (source === 'manual' && transaction) void compareManual(transaction, reference);
             else void refresh(reference);
           }}>
-          {REFERENCES.map(reference => <option key={reference}>{reference}</option>)}
+          {MARKET_SELECTIONS.map(reference => <option key={reference}>{reference}</option>)}
         </select>
       </label>
       <Verdict comparison={comparison} transaction={transaction} loading={loading} expired={expired} error={error} />
@@ -301,9 +324,11 @@ export function Popup() {
           {!loading && !detailed && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh(selectedReference)}>Réessayer</button>}
           {expired && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh(selectedReference)}>Actualiser</button>}
           {detailed && !expired && source === 'manual' && <button className="text-button" type="button" onClick={() => show('manual')}>Modifier le devis</button>}
+          {siteOrigin && <button className="text-button" type="button" onClick={() => void activateSite()}>Activer sur ce site</button>}
           <button className="text-button" type="button" onClick={() => show('method')}>Comment est-ce calculé ?</button>
         </div>
       </div>
+      {siteStatus && <p role="status" className="hint">{siteStatus}</p>}
     </main> : <main className="subpage" ref={pageRef} tabIndex={-1} aria-labelledby="view-title">
       <button className="text-button back" type="button" onClick={() => show('home')}><Icon name="back" size={14} /> Retour</button>
       {view === 'details' && detailed && <>
