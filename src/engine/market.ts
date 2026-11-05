@@ -4,10 +4,15 @@ export const BOOK_MAX_AGE_MS = 12_000;
 export const CLOCK_SKEW_MS = 2_000;
 
 const KRAKEN_API = 'https://api.kraken.com/0/public/';
+const BINANCE_API = 'https://data-api.binance.vision/api/v3/';
+const COINBASE_API = 'https://api.exchange.coinbase.com/products/';
+const VERIFIED_CROSS_VENUE_ASSETS = new Set(['BTC', 'ETH', 'SOL']);
+const COINBASE_QUOTES = new Set(['EUR', 'USD', 'GBP']);
 const UNIT = 10n ** BigInt(INPUT_DECIMALS);
 const KRAKEN_SPREAD_LIMIT = UNIT * 25n / 1000n;
 
-export type Reference = 'Kraken Pro';
+export const REFERENCES = ['Kraken Pro', 'Binance Spot', 'Coinbase Exchange'] as const;
+export type Reference = typeof REFERENCES[number];
 export type MarketError = 'unsupported-pair' | 'market-unavailable' | 'order-size'
   | 'insufficient-depth' | 'stale-book' | 'network-error';
 
@@ -24,7 +29,11 @@ export type Market = {
   asks: Level[];
   snapshotAt: number;
   minCost: bigint;
-};
+} & (
+  { reference: 'Kraken Pro' }
+  | { reference: 'Coinbase Exchange'; slippageLimit: bigint }
+  | { reference: 'Binance Spot'; maxCost?: bigint }
+);
 
 type RequestContext = { fetch: typeof fetch; now: () => number };
 
@@ -62,7 +71,7 @@ async function request(context: RequestContext, url: string, missingIsUnsupporte
       referrerPolicy: 'no-referrer',
       signal: controller.signal,
     });
-    if (response.status === 404 && missingIsUnsupported) fail('unsupported-pair');
+    if ((response.status === 400 || response.status === 404) && missingIsUnsupported) fail('unsupported-pair');
     if (!response.ok) fail('network-error');
     return { body: object(await response.json()), headers: response.headers };
   } catch (error) {
@@ -110,7 +119,7 @@ function parseBook(book: JsonObject, snapshotAt: number, context: RequestContext
   return { bids, asks, snapshotAt };
 }
 
-export async function loadMarket(
+async function krakenMarket(
   context: RequestContext,
   base: string,
   quote: string,
@@ -146,17 +155,109 @@ export async function loadMarket(
   // Kraken's per-level timestamps describe resting levels, so the HTTP date is the snapshot freshness proxy.
   return {
     ...parseBook(object(krakenResult(depth.body)[pairId]), snapshotAt, context),
+    reference: 'Kraken Pro',
     minCost,
   };
+}
+
+async function coinbaseMarket(
+  context: RequestContext,
+  base: string,
+  quote: string,
+  quantity: bigint,
+): Promise<Market> {
+  if (!VERIFIED_CROSS_VENUE_ASSETS.has(base) || !COINBASE_QUOTES.has(quote)) fail('unsupported-pair');
+
+  const pair = base + '-' + quote;
+  const url = COINBASE_API + pair;
+  const { body: info } = await request(context, url, true);
+  if (info.id !== pair || info.base_currency !== base || info.quote_currency !== quote) fail('unsupported-pair');
+  if (info.status !== 'online' || info.post_only !== false || info.limit_only !== false || info.cancel_only !== false
+    || info.auction_mode !== false || info.trading_disabled === true) fail('market-unavailable');
+
+  const minCost = parseDecimal(info.min_market_funds);
+  const increment = parseDecimal(info.base_increment);
+  const slippageLimit = parseDecimal(info.max_slippage_percentage);
+  if (minCost === undefined || !increment || !slippageLimit || slippageLimit >= UNIT) fail('market-unavailable');
+  if (quantity % increment !== 0n) fail('order-size');
+
+  const { body: book } = await request(context, url + '/book?level=2', true);
+  if (book.auction_mode === true) fail('market-unavailable');
+  const snapshotAt = typeof book.time === 'string' ? Date.parse(book.time) : NaN;
+  return { ...parseBook(book, snapshotAt, context), reference: 'Coinbase Exchange', minCost, slippageLimit };
+}
+
+async function binanceMarket(
+  context: RequestContext, base: string, quote: string, quantity: bigint,
+): Promise<Market> {
+  if (!VERIFIED_CROSS_VENUE_ASSETS.has(base)) fail('unsupported-pair');
+  const symbol = base + quote;
+  const { body } = await request(context, BINANCE_API + 'exchangeInfo?' + new URLSearchParams({ symbol }), true);
+  if (!Array.isArray(body.symbols) || body.symbols.length !== 1) fail('unsupported-pair');
+  const info = object(body.symbols[0]);
+  if (info.symbol !== symbol || info.baseAsset !== base || info.quoteAsset !== quote) fail('unsupported-pair');
+  if (info.status !== 'TRADING' || info.isSpotTradingAllowed !== true
+    || !Array.isArray(info.orderTypes) || !info.orderTypes.includes('MARKET')
+    || !Array.isArray(info.filters)) fail('market-unavailable');
+
+  const filters = info.filters.map(object);
+  for (const type of ['LOT_SIZE', 'MARKET_LOT_SIZE']) {
+    const lot = filters.find(filter => filter.filterType === type);
+    if (!lot) fail('market-unavailable');
+    const min = parseDecimal(lot.minQty);
+    const max = parseDecimal(lot.maxQty);
+    const step = parseDecimal(lot.stepSize);
+    if (min === undefined || max === undefined || step === undefined) fail('market-unavailable');
+    if (quantity < min || (max > 0n && quantity > max) || (step > 0n && quantity % step !== 0n)) fail('order-size');
+  }
+
+  let minCost = 0n;
+  let maxCost: bigint | undefined;
+  for (const filter of filters) {
+    if (filter.filterType !== 'MIN_NOTIONAL' && filter.filterType !== 'NOTIONAL') continue;
+    if (filter.applyToMarket === true || filter.applyMinToMarket === true) {
+      const value = parseDecimal(filter.minNotional);
+      if (value === undefined) fail('market-unavailable');
+      if (value > minCost) minCost = value;
+    }
+    if (filter.applyMaxToMarket === true) {
+      const value = parseDecimal(filter.maxNotional);
+      if (!value) fail('market-unavailable');
+      if (maxCost === undefined || value < maxCost) maxCost = value;
+    }
+  }
+
+  const { body: book, headers } = await request(
+    context, BINANCE_API + 'depth?' + new URLSearchParams({ symbol, limit: '100' }), true,
+  );
+  const age = Number(headers.get('Age') ?? '0');
+  if (!Number.isFinite(age) || age < 0) fail('stale-book');
+  const snapshotAt = Math.min(Date.parse(headers.get('Date') ?? ''), context.now() - age * 1000);
+  return { ...parseBook(book, snapshotAt, context), reference: 'Binance Spot', minCost, maxCost };
+}
+
+export function loadMarket(reference: Reference, context: RequestContext, base: string, quote: string, quantity: bigint) {
+  switch (reference) {
+    case 'Binance Spot': return binanceMarket(context, base, quote, quantity);
+    case 'Coinbase Exchange': return coinbaseMarket(context, base, quote, quantity);
+    case 'Kraken Pro': return krakenMarket(context, base, quote, quantity);
+  }
 }
 
 function checkPriceProtection(market: Market, side: 'buy' | 'sell', worstPrice: bigint) {
   const bid = market.bids[0].price;
   const ask = market.asks[0].price;
-  const low = side === 'buy' ? bid : worstPrice;
-  const high = side === 'buy' ? worstPrice : ask;
-  // The venue's lowest published market protection across spot pairs is 2.5%.
-  if ((high - low) * 2n * UNIT >= (high + low) * KRAKEN_SPREAD_LIMIT) fail('insufficient-depth');
+  if (market.reference !== 'Coinbase Exchange') {
+    const low = side === 'buy' ? bid : worstPrice;
+    const high = side === 'buy' ? worstPrice : ask;
+    // Conservative spread guard. Kraken documents this as its lowest spot protection.
+    if ((high - low) * 2n * UNIT >= (high + low) * KRAKEN_SPREAD_LIMIT) fail('insufficient-depth');
+  } else {
+    // Coinbase Exchange measures price protection from the book's original midpoint.
+    const doubledMidpoint = bid + ask;
+    const distance = side === 'buy' ? worstPrice * 2n - doubledMidpoint : doubledMidpoint - worstPrice * 2n;
+    if (distance * UNIT > doubledMidpoint * market.slippageLimit) fail('insufficient-depth');
+  }
 }
 
 export function fillMarket(market: Market, side: 'buy' | 'sell', quantity: bigint, feeBps: number) {
@@ -174,7 +275,8 @@ export function fillMarket(market: Market, side: 'buy' | 'sell', quantity: bigin
   }
   if (remaining > 0n) fail('insufficient-depth');
   checkPriceProtection(market, side, lastPrice);
-  if (gross < market.minCost * UNIT) fail('order-size');
+  if (gross < market.minCost * UNIT || (market.reference === 'Binance Spot'
+    && market.maxCost !== undefined && gross > market.maxCost * UNIT)) fail('order-size');
 
   const fee = gross * BigInt(feeBps);
   const grossQuote = gross * BPS;

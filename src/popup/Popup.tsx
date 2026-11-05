@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Comparison, Transaction } from '../engine';
+import { REFERENCES, type Comparison, type Reference, type Transaction } from '../engine';
 import { DEFAULT_SETTINGS, request } from '../shared';
 import type { PopupState, Settings } from '../shared';
 import { ManualForm, SettingsForm } from './Forms';
@@ -51,7 +51,7 @@ function ratio(value: number) {
 }
 
 function platformName(platform: PopupState['platform']) {
-  return platform === 'kraken' ? 'Kraken' : platform === 'kraken-pro' ? 'Kraken Pro' : '—';
+  return platform ? { kraken: 'Kraken', 'kraken-pro': 'Kraken Pro', binance: 'Binance', coinbase: 'Coinbase', other: 'Autre plateforme' }[platform] : '—';
 }
 
 function Metric({ label, children }: { label: string; children: ReactNode }) {
@@ -135,7 +135,7 @@ function Method() {
   return <div className="method-list">
     <article><h2>Même transaction</h2><p>Prisme compare le total final du devis avec le prix d’un ordre au marché de même sens, quantité et paire. Les deux totaux utilisent la même devise.</p></article>
     <article><h2>Prix disponible au carnet</h2><p>Le calcul parcourt les niveaux d’achat ou de vente jusqu’à couvrir la quantité. Les frais estimés sont ajoutés à un achat et déduits d’une vente.</p></article>
-    <article><h2>Sources de référence</h2><p>Les devis Kraken et Kraken Pro sont comparés au carnet Spot public de Kraken. Pour un devis Kraken Pro, le résultat mesure l’écart avec une estimation sur le même marché.</p></article>
+    <article><h2>Sources de référence</h2><p>Sélectionnez Kraken Pro, Binance Spot ou Coinbase Exchange. La disponibilité dépend de la paire. Les frais de référence sont estimés selon le taux saisi.</p></article>
     <article><h2>Fonds et coûts annexes</h2><p>Le calcul suppose des fonds disponibles dans la même devise sur les deux plateformes. Il exclut les conversions, les transferts et les retraits.</p></article>
   </div>;
 }
@@ -144,6 +144,7 @@ const initialState: PopupState = { platform: null, transaction: null, comparison
 export function Popup() {
   const [data, setData] = useState(initialState);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [selectedReference, setSelectedReference] = useState<Reference>();
   const [settingsAvailable, setSettingsAvailable] = useState(false);
   const [view, setView] = useState<View>('home');
   const [source, setSource] = useState<'tab' | 'manual'>('tab');
@@ -154,14 +155,14 @@ export function Popup() {
   const focusPage = useRef(false);
   const requestVersion = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (reference?: Reference) => {
     const version = ++requestVersion.current;
     setLoading(true);
     setError(false);
     setExpired(false);
     setSource('tab');
     try {
-      const result = await request<PopupState>({ type: 'PRISME_GET_STATE' });
+      const result = await request<PopupState>({ type: 'PRISME_GET_STATE', reference });
       if (requestVersion.current === version) setData(result);
     } catch {
       if (requestVersion.current === version) {
@@ -215,7 +216,7 @@ export function Popup() {
     setView(next);
   }
 
-  async function compareManual(manual: Transaction) {
+  async function compareManual(manual: Transaction, reference = selectedReference) {
     const version = ++requestVersion.current;
     setLoading(true);
     setError(false);
@@ -224,7 +225,7 @@ export function Popup() {
     setData({ platform: manual.platform, transaction: manual, comparison: null });
     show('home');
     try {
-      const result = await request<Comparison>({ type: 'PRISME_COMPARE_MANUAL', transaction: manual });
+      const result = await request<Comparison>({ type: 'PRISME_COMPARE_MANUAL', transaction: manual, reference });
       if (requestVersion.current === version) {
         setData({ platform: manual.platform, transaction: manual, comparison: result });
       }
@@ -238,6 +239,7 @@ export function Popup() {
   async function saveSettings(next: Settings) {
     const saved = await request<Settings>({ type: 'PRISME_SAVE_SETTINGS', settings: next });
     setSettings(saved);
+    setSelectedReference(saved.reference);
     if (source === 'manual') {
       requestVersion.current += 1;
       setLoading(false);
@@ -264,6 +266,18 @@ export function Popup() {
     </header>
 
     {view === 'home' ? <main ref={pageRef} tabIndex={-1} aria-label="Comparaison">
+      <label className="field reference-picker">Comparer avec
+        <select value={selectedReference ?? settings.reference ?? 'Kraken Pro'} disabled={loading}
+          onChange={event => {
+            const reference = REFERENCES.find(value => value === event.currentTarget.value);
+            if (!reference) return;
+            setSelectedReference(reference);
+            if (source === 'manual' && transaction) void compareManual(transaction, reference);
+            else void refresh(reference);
+          }}>
+          {REFERENCES.map(reference => <option key={reference}>{reference}</option>)}
+        </select>
+      </label>
       <Verdict comparison={comparison} transaction={transaction} loading={loading} expired={expired} error={error} />
       <dl className="transaction">
         <Metric label="Paire">{transaction ? transaction.base + ' / ' + transaction.quote : '—'}</Metric>
@@ -271,6 +285,7 @@ export function Popup() {
         <Metric label={transaction?.side === 'buy' ? 'Total à payer' : transaction?.side === 'sell' ? 'Total à recevoir' : 'Montant'}>
           {transaction ? money(transaction.total, transaction.quote) : '—'}
         </Metric>
+        {detailed && !expired && <Metric label="Total de référence estimé">{money(comparison.referenceTotal, transaction.quote)}</Metric>}
         <Metric label="Dernière vérification">{comparison ? hour.format(comparison.checkedAt) : '—'}</Metric>
       </dl>
       <div className="actions">
@@ -283,8 +298,8 @@ export function Popup() {
               {source === 'manual' ? 'Vérifier le devis saisi' : 'Saisir un devis'}<Icon name="edit" size={14} />
             </button>}
         <div className="small-actions">
-          {!loading && !detailed && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh()}>Réessayer</button>}
-          {expired && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh()}>Actualiser</button>}
+          {!loading && !detailed && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh(selectedReference)}>Réessayer</button>}
+          {expired && source === 'tab' && <button className="text-button" type="button" onClick={() => void refresh(selectedReference)}>Actualiser</button>}
           {detailed && !expired && source === 'manual' && <button className="text-button" type="button" onClick={() => show('manual')}>Modifier le devis</button>}
           <button className="text-button" type="button" onClick={() => show('method')}>Comment est-ce calculé ?</button>
         </div>
@@ -298,7 +313,7 @@ export function Popup() {
       {view === 'method' && <><h1 id="view-title">Comment est-ce calculé ?</h1><Method /></>}
       {view === 'manual' && <>
         <h1 id="view-title">Saisir un devis</h1>
-        <p>Recopiez la quantité de crypto et le total final d’un devis au comptant affiché à l’instant, dans une devise traditionnelle comme l’euro.</p>
+        <p>Recopiez la quantité de crypto et le total final d’un devis au comptant affiché à l’instant, dans la devise exacte du devis, par exemple EUR ou USDC.</p>
         <ManualForm transaction={transaction} platform={data.platform} onCompare={compareManual} />
       </>}
       {view === 'settings' && <>

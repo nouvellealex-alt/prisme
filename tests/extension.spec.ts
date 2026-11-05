@@ -149,3 +149,41 @@ test('detects a visible Kraken review and removes the badge when the review disa
   await site.getByRole('dialog').evaluate(node => node.remove());
   await expect(badge).toHaveCount(0);
 });
+test('switches the same Binance quote between spot references and applies the selected fee', async ({ extension }) => {
+  await mockKraken(extension.context);
+  const calls: string[] = [];
+  await extension.context.route('https://data-api.binance.vision/api/v3/**', async route => {
+    const url = new URL(route.request().url());
+    calls.push(url.pathname + url.search);
+    if (url.pathname.endsWith('/exchangeInfo')) {
+      return route.fulfill({ json: { symbols: [{
+        symbol: 'BTCEUR', baseAsset: 'BTC', quoteAsset: 'EUR', status: 'TRADING',
+        isSpotTradingAllowed: true, orderTypes: ['MARKET'],
+        filters: [
+          { filterType: 'LOT_SIZE', minQty: '0.00001', maxQty: '100', stepSize: '0.00001' },
+          { filterType: 'MARKET_LOT_SIZE', minQty: '0', maxQty: '100', stepSize: '0' },
+          { filterType: 'NOTIONAL', applyMinToMarket: true, minNotional: '5' },
+        ],
+      }] } });
+    }
+    return route.fulfill({ headers: { date: new Date().toUTCString() }, json: {
+      bids: [['48950', '1']], asks: [['49000', '1']],
+    } });
+  });
+  const page = await openPopup(extension.context, extension.url);
+  await page.getByRole('button', { name: 'Paramètres' }).click();
+  await page.getByLabel(/Kraken Pro \(%\)/).fill('0,40');
+  await page.getByLabel(/Binance Spot \(%\)/).fill('0,10');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await page.getByRole('button', { name: 'Saisir un devis' }).click();
+  await page.getByLabel('Plateforme').selectOption('binance');
+  await page.getByLabel('Crypto', { exact: true }).fill('BTC');
+  await page.getByLabel('Devise du total').fill('EUR');
+  await page.getByLabel('Quantité de crypto').fill('0,01');
+  await page.getByLabel('Total à payer').fill('520');
+  await page.getByRole('button', { name: 'Comparer ce devis' }).click();
+  await expect(page.getByRole('heading', { name: /Économie possible de 13,98/ })).toBeVisible();
+  await page.getByLabel('Comparer avec').selectOption('Binance Spot');
+  await expect(page.getByRole('heading', { name: /Économie possible de 29,51/ })).toBeVisible();
+  expect(calls).toEqual(['/api/v3/exchangeInfo?symbol=BTCEUR', '/api/v3/depth?symbol=BTCEUR&limit=100']);
+});

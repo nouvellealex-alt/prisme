@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Transaction } from '../engine';
+import { REFERENCES, type Transaction } from '../engine';
 import { parseDecimal } from '../engine/decimal';
 import type { PopupState, Settings } from '../shared';
 
@@ -21,7 +21,7 @@ export function ManualForm({ transaction, platform, onCompare }: {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (key: string) => String(form.get(key) ?? '').trim();
-    const submittedPlatform = text('platform') === 'kraken-pro' ? 'kraken-pro' : 'kraken';
+    const submittedPlatform = text('platform') as Transaction['platform'];
     const base = text('base').toUpperCase();
     const quote = text('quote').toUpperCase();
     const quantity = decimal(text('quantity'));
@@ -54,6 +54,7 @@ export function ManualForm({ transaction, platform, onCompare }: {
       <label className="field">Plateforme
         <select name="platform" defaultValue={transaction?.platform ?? platform ?? 'kraken'}>
           <option value="kraken">Kraken</option><option value="kraken-pro">Kraken Pro</option>
+          <option value="binance">Binance</option><option value="coinbase">Coinbase</option><option value="other">Autre plateforme</option>
         </select>
       </label>
       <label className="field">Opération
@@ -109,19 +110,25 @@ export function SettingsForm({ settings, onSave }: {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const theme = form.get('theme');
-    const kraken = String(form.get('krakenFee') ?? '').trim();
-    const krakenTakerBps = bps(kraken);
-    if (kraken && krakenTakerBps === undefined) {
-      setError('Saisissez un taux entre 0 et 10 %, avec au maximum deux décimales.');
-      return;
+    const fees: Pick<Settings, 'krakenTakerBps' | 'binanceTakerBps' | 'coinbaseTakerBps'> = {};
+    for (const key of ['krakenTakerBps', 'binanceTakerBps', 'coinbaseTakerBps'] as const) {
+      const input = String(form.get(key) ?? '').trim();
+      const value = bps(input);
+      if (input && value === undefined) {
+        setError('Saisissez un taux entre 0 et 10 %, avec au maximum deux décimales.');
+        return;
+      }
+      fees[key] = value;
     }
+    const reference = REFERENCES.find(value => value === form.get('reference')) ?? 'Kraken Pro';
     setError('');
     setSaving(true);
     try {
       await onSave({
         theme: theme === 'light' || theme === 'dark' ? theme : 'auto',
         inlineEnabled: form.has('inline'),
-        krakenTakerBps,
+        ...fees,
+        reference,
       });
     } catch {
       setError('Les paramètres n’ont pas été enregistrés. Réessayez.');
@@ -131,12 +138,17 @@ export function SettingsForm({ settings, onSave }: {
 
   return <form className="form" onSubmit={submit}>
     <p>Saisissez votre taux de frais pour un ordre au marché. Laissez le champ vide si vous ne le connaissez pas.</p>
-    <div className="form-row">
-      <label className="field">Kraken Pro (%)
-        <input name="krakenFee" inputMode="decimal" maxLength={6} autoComplete="off" defaultValue={feePercent(settings.krakenTakerBps)} />
-        <span className="hint">Pour les devis Kraken et Kraken Pro.</span>
+    <label className="field">Marché par défaut
+      <select name="reference" defaultValue={settings.reference ?? 'Kraken Pro'}>
+        {REFERENCES.map(reference => <option key={reference}>{reference}</option>)}
+      </select>
+    </label>
+    {([['krakenTakerBps', 'Kraken Pro'], ['binanceTakerBps', 'Binance Spot'],
+      ['coinbaseTakerBps', 'Coinbase Exchange']] as const).map(([key, label]) =>
+      <label key={key} className="field">{label} (%)
+        <input name={key} inputMode="decimal" maxLength={6} autoComplete="off" defaultValue={feePercent(settings[key])} />
       </label>
-    </div>
+    )}
     <label className="field">Apparence
       <select name="theme" defaultValue={settings.theme}>
         <option value="auto">Suivre le système</option>

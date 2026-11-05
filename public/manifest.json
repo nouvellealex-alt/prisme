@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prisme",
-  "description": "Comparez un devis crypto Kraken avec le coût estimé d’un ordre au marché.",
-  "version": "1.1.0",
+  "description": "Comparez un devis crypto avec le coût estimé d’un ordre au marché.",
+  "version": "1.2.0",
   "minimum_chrome_version": "120",
   "action": {
     "default_title": "Prisme",
@@ -12,7 +12,7 @@
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "background": { "service_worker": "background.js", "type": "module" },
   "permissions": ["storage"],
-  "host_permissions": ["https://api.kraken.com/*"],
+  "host_permissions": ["https://api.kraken.com/*", "https://data-api.binance.vision/*", "https://api.exchange.coinbase.com/*"],
   "content_scripts": [
     {
       "matches": ["https://app.kraken.com/*", "https://pro.kraken.com/*"],

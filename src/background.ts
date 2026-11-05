@@ -1,13 +1,15 @@
-import { compareTransaction, isTransaction, type Comparison, type Transaction } from './engine';
+import { compareTransaction, isTransaction, REFERENCES, type Reference, type Comparison, type Transaction } from './engine';
 import { getSettings, parseSettings, platformFromUrl, STORAGE_KEY, type PopupRequest, type PopupState } from './shared';
 
 type ComparePageRequest = { type: 'PRISME_COMPARE_TRANSACTION'; transaction: Transaction };
 
-async function compare(transaction: Transaction): Promise<Comparison> {
-  return compareTransaction(transaction, await getSettings());
+async function compare(transaction: Transaction, reference?: Reference): Promise<Comparison> {
+  const settings = await getSettings();
+  if (reference && REFERENCES.includes(reference)) settings.reference = reference;
+  return compareTransaction(transaction, settings);
 }
 
-async function currentState(): Promise<PopupState> {
+async function currentState(reference?: Reference): Promise<PopupState> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const platform = platformFromUrl(tab?.url);
   if (tab?.id === undefined) return { platform, transaction: null, comparison: null };
@@ -21,7 +23,7 @@ async function currentState(): Promise<PopupState> {
   if (!isTransaction(transaction) || (platform && transaction.platform !== platform)) {
     return { platform, transaction: null, comparison: null };
   }
-  const comparison = await compare(transaction);
+  const comparison = await compare(transaction, reference);
   if (comparison.status === 'unavailable') return { platform: transaction.platform, transaction, comparison };
 
   // The tab may have navigated or updated the quote while the public book was loading.
@@ -36,8 +38,8 @@ async function currentState(): Promise<PopupState> {
 
 async function handlePopup(message: PopupRequest): Promise<unknown> {
   switch (message.type) {
-    case 'PRISME_GET_STATE': return currentState();
-    case 'PRISME_COMPARE_MANUAL': return compare(message.transaction);
+    case 'PRISME_GET_STATE': return currentState(message.reference);
+    case 'PRISME_COMPARE_MANUAL': return compare(message.transaction, message.reference);
     case 'PRISME_GET_SETTINGS': return getSettings();
     case 'PRISME_SAVE_SETTINGS': {
       const settings = parseSettings(message.settings);

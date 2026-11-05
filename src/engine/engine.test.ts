@@ -131,7 +131,7 @@ describe('compareTransaction', () => {
 
   it('excludes crypto conversions and FX pairs before fetching a reference', async () => {
     const fetch = krakenResponses();
-    for (const order of [{ ...source, quote: 'USDT' }, { ...source, base: 'USD' }]) {
+    for (const order of [{ ...source, quote: 'ETH' }, { ...source, base: 'USD' }]) {
       await expect(compareTransaction(order, { krakenTakerBps: 80 }, { fetch, now: () => now }))
         .resolves.toMatchObject({ reason: 'unsupported-pair' });
     }

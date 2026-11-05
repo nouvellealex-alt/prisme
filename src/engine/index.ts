@@ -10,14 +10,14 @@ import {
   type Reference,
 } from './market';
 
-export { normalizeAsset } from './market';
+export { normalizeAsset, REFERENCES, type Reference } from './market';
 
 export const TRANSACTION_MAX_AGE_MS = 20_000;
 export const COMPARISON_THRESHOLD_BPS = 25;
 export const MAX_FEE_BPS = 1000;
 
 export type Transaction = {
-  platform: 'kraken' | 'kraken-pro';
+  platform: 'kraken' | 'kraken-pro' | 'binance' | 'coinbase' | 'other';
   side: 'buy' | 'sell';
   base: string;
   quote: string;
@@ -32,6 +32,9 @@ export type Transaction = {
 
 export type ComparisonSettings = {
   krakenTakerBps?: number;
+  binanceTakerBps?: number;
+  coinbaseTakerBps?: number;
+  reference?: Reference;
 };
 
 export type UnavailableReason = MarketError | 'invalid-transaction' | 'stale-transaction' | 'fee-not-configured';
@@ -58,6 +61,7 @@ export type Comparison = {
 };
 
 const ASSET_CODE = /^[A-Z0-9]{2,12}$/;
+const STABLE_QUOTES = new Set(['USDT', 'USDC']);
 const FIAT = new Set(['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD']);
 
 export function isFeeBps(value: unknown): value is number {
@@ -67,7 +71,7 @@ export function isFeeBps(value: unknown): value is number {
 function parseTransaction(transaction: Transaction) {
   if (typeof transaction !== 'object' || transaction === null) return;
   const { platform, side, base, quote, fee, observedAt } = transaction;
-  if (platform !== 'kraken' && platform !== 'kraken-pro') return;
+  if (!['kraken', 'kraken-pro', 'binance', 'coinbase', 'other'].includes(platform)) return;
   if (side !== 'buy' && side !== 'sell') return;
   if (typeof base !== 'string' || typeof quote !== 'string' || !ASSET_CODE.test(base) || !ASSET_CODE.test(quote)) return;
   if (!Number.isSafeInteger(observedAt) || observedAt <= 0) return;
@@ -105,15 +109,19 @@ export async function compareTransaction(
   const { side, base, quote, quantity, total, observedAt } = order;
   const expiresAt = observedAt + TRANSACTION_MAX_AGE_MS;
   if (now() >= expiresAt || observedAt > now() + CLOCK_SKEW_MS) return unavailable('stale-transaction');
-  if (FIAT.has(base) || !FIAT.has(quote)) return unavailable('unsupported-pair');
+  if (FIAT.has(base) || !(FIAT.has(quote) || STABLE_QUOTES.has(quote))) return unavailable('unsupported-pair');
 
-  const reference = 'Kraken Pro';
-  const feeBps = settings.krakenTakerBps;
+  const reference = settings.reference ?? 'Kraken Pro';
+  const feeBps = {
+    'Kraken Pro': settings.krakenTakerBps,
+    'Binance Spot': settings.binanceTakerBps,
+    'Coinbase Exchange': settings.coinbaseTakerBps,
+  }[reference];
   if (!isFeeBps(feeBps)) return unavailable('fee-not-configured');
 
   try {
     const fetch = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
-    const market = await loadMarket({ fetch, now }, base, quote, quantity);
+    const market = await loadMarket(reference, { fetch, now }, base, quote, quantity);
     const fill = fillMarket(market, side, quantity, feeBps);
     const checkedAt = now();
     if (checkedAt >= expiresAt) return unavailable('stale-transaction');

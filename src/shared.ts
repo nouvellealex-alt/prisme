@@ -1,16 +1,15 @@
-import { isFeeBps, type Comparison, type Transaction } from './engine';
+import { isFeeBps, REFERENCES, type ComparisonSettings, type Reference, type Comparison, type Transaction } from './engine';
 
 export type Platform = Transaction['platform'];
 export type Theme = 'auto' | 'light' | 'dark';
 
-export interface Settings {
-  krakenTakerBps?: number;
+export interface Settings extends ComparisonSettings {
   theme: Theme;
   inlineEnabled: boolean;
 }
 
 export const STORAGE_KEY = 'preferences';
-export const DEFAULT_SETTINGS: Readonly<Settings> = { theme: 'auto', inlineEnabled: true };
+export const DEFAULT_SETTINGS: Readonly<Settings> = { theme: 'auto', inlineEnabled: true, reference: 'Kraken Pro' };
 
 export interface PopupState {
   transaction: Transaction | null;
@@ -19,8 +18,8 @@ export interface PopupState {
 }
 
 export type PopupRequest =
-  | { type: 'PRISME_GET_STATE' }
-  | { type: 'PRISME_COMPARE_MANUAL'; transaction: Transaction }
+  | { type: 'PRISME_GET_STATE'; reference?: Reference }
+  | { type: 'PRISME_COMPARE_MANUAL'; transaction: Transaction; reference?: Reference }
   | { type: 'PRISME_GET_SETTINGS' }
   | { type: 'PRISME_SAVE_SETTINGS'; settings: Settings };
 
@@ -42,10 +41,14 @@ export function parseSettings(value: unknown): Settings {
   if (!value || typeof value !== 'object') return { ...DEFAULT_SETTINGS };
   const input = value as Partial<Settings>;
   const settings: Settings = {
+    reference: input.reference && REFERENCES.includes(input.reference) ? input.reference : 'Kraken Pro',
     theme: input.theme === 'light' || input.theme === 'dark' ? input.theme : 'auto',
     inlineEnabled: typeof input.inlineEnabled === 'boolean' ? input.inlineEnabled : DEFAULT_SETTINGS.inlineEnabled,
   };
-  if (isFeeBps(input.krakenTakerBps)) settings.krakenTakerBps = input.krakenTakerBps;
+  for (const key of ['krakenTakerBps', 'binanceTakerBps', 'coinbaseTakerBps'] as const) {
+    const fee = input[key];
+    if (isFeeBps(fee)) settings[key] = fee;
+  }
   return settings;
 }
 
