@@ -4,6 +4,12 @@
 
 Prisme is a Chrome extension that checks whether a crypto buy or sell quote is competitive for the same quantity. Its French-language popup shows one verdict, the time of the check, and the difference after estimated trading fees when the data supports a comparison.
 
+[**Download Prisme for Chrome**](https://github.com/nouvellealex-alt/prisme/releases/latest)
+
+![Prisme compares a €520 Bitcoin quote with the €500.75 average of two markets](docs/images/prisme-on-page.png)
+
+*Illustrative data. Prisme estimates a €19.25 difference for the same amount of BTC, including estimated trading fees.*
+
 ## Install in Chrome
 
 1. Extract `prisme-chrome-v1.3.0.zip`, or build from source as shown below.

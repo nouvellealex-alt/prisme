@@ -2,7 +2,25 @@
 
 [English](README.en.md) · [Méthode et sources](docs/method.md) · [Propositions visuelles](docs/design.md) · [Brief produit](docs/product-brief.fr.md)
 
-Prisme est une extension Chrome qui répond à une question simple avant un achat ou une vente de crypto. Le total proposé est-il compétitif pour la même quantité ? Le popup affiche un verdict, l’heure de la vérification et, quand les données le permettent, l’écart après frais estimés.
+**Ton achat de crypto est-il au bon prix ?** Avant de confirmer, compare le montant que tu vas payer, frais compris, à ce que coûterait la même quantité sur Kraken Pro, Binance Spot ou Coinbase Exchange.
+
+[**Télécharger Prisme pour Chrome**](https://github.com/nouvellealex-alt/prisme/releases/latest) · [Installation](#installation-dans-chrome)
+
+![Prisme compare un achat de bitcoin à 520 € avec la moyenne de deux marchés estimée à 500,75 €](docs/images/prisme-on-page.png)
+
+*Exemple fictif. Pour la même quantité de BTC, le devis affiche 520 €. La moyenne estimée de deux marchés est de 500,75 €, soit 19,25 € d’écart.*
+
+### Ce que tu vois avant de confirmer
+
+| 🔴 Un autre marché est plus avantageux | 🟢 Le devis est compétitif | ⚪ La comparaison est indisponible |
+| :---: | :---: | :---: |
+| <img src="docs/images/quote-more-expensive.png" width="240" alt="Popup Prisme en rouge avec une économie estimée de 13,98 €"> | <img src="docs/images/quote-competitive.png" width="240" alt="Popup Prisme en vert avec le verdict Bon prix"> | <img src="docs/images/quote-unavailable.png" width="240" alt="Popup Prisme en gris quand la référence est indisponible"> |
+
+*Captures de l’extension avec des données de démonstration.*
+
+- **Compare le total.** Prisme estime le prix pour la même paire, la même quantité et la même devise, puis applique le taux de frais que tu as renseigné.
+- **Choisis le point de comparaison.** Passe d’un marché à l’autre ou affiche la moyenne de deux références valides ou plus.
+- **Garde ton parcours habituel.** Le badge apparaît à côté d’un récapitulatif reconnu. Tu peux aussi recopier un devis dans l’extension.
 
 ## Comment ça marche ?
 
@@ -39,7 +57,7 @@ Sur un autre site, ouvrez Prisme, cliquez sur **Activer sur ce site** et accorde
 
 Les références disponibles sont Kraken Pro, Binance Spot et Coinbase Exchange. La moyenne arithmétique utilise au moins deux références valides, frais compris. Vert indique un devis compétitif face à la référence choisie. Rouge indique un écart en faveur de la référence supérieur à 0,25 %. Gris indique que la comparaison est indisponible. Pour les deux références externes, le moteur limite les actifs de base à BTC, ETH et SOL. La paire exacte doit exister chez le concurrent.
 
-**Bon prix** signifie que le prix proposé est au moins aussi favorable que la référence ou reste proche du total de référence après frais. Une économie éventuelle est une estimation calculée à partir du carnet, susceptible d’évoluer avant exécution. La référence indique une seule plateforme et dépend de l’accès au marché et aux fonds dans la devise affichée.
+**Bon prix** signifie que le prix proposé est au moins aussi favorable que la référence ou reste proche du total de référence après frais. Une économie éventuelle est une estimation calculée à partir du carnet, susceptible d’évoluer avant exécution. Les estimations supposent un accès au marché et des fonds dans la devise affichée.
 
 ## Développement
 
