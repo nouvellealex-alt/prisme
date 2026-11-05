@@ -4,6 +4,23 @@
 
 Prisme est une extension Chrome qui répond à une question simple avant un achat ou une vente de crypto sur Kraken. Le total proposé est-il compétitif pour la même quantité ? Le popup affiche un verdict, l’heure de la vérification et, quand les données le permettent, l’écart après frais estimés.
 
+## Comment ça marche ?
+
+```mermaid
+flowchart TD
+    A["Devis d’achat ou de vente sur Kraken ou Kraken Pro"] --> B["Prisme lit le récapitulatif, ou tu saisis le devis"]
+    B --> C{"D’où vient le devis ?"}
+    C -->|Kraken| D["Carnet public Kraken Pro"]
+    C -->|Kraken Pro| E["Carnet Coinbase Exchange · paires compatibles"]
+    D --> F["Même quantité, même devise · frais estimés inclus"]
+    E --> F
+    F --> G{"Données suffisantes ?"}
+    G -->|Oui| H["Bon prix ou économie potentielle"]
+    G -->|Non| I["Comparaison indisponible"]
+```
+
+Coinbase Exchange sert de référence de prix pour certains devis Kraken Pro. La détection automatique est disponible sur les pages Kraken et Kraken Pro reconnues.
+
 ## Installation dans Chrome
 
 1. Décompressez `prisme-chrome-v1.0.0.zip`. Vous pouvez aussi compiler le projet avec les commandes ci-dessous.
