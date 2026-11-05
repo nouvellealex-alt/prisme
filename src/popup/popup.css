@@ -254,4 +254,9 @@ h1, h2, p, dl, dd { margin: 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-.reference-picker { margin: 0 0 4px; }
+.reference-picker {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  margin: 0 0 4px;
+}

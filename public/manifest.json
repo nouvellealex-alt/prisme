@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Prisme",
   "description": "Comparez un devis crypto avec le coût estimé d’un ordre au marché.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minimum_chrome_version": "120",
   "action": {
     "default_title": "Prisme",

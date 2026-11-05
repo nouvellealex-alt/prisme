@@ -6,7 +6,7 @@ Prisme is a Chrome extension that checks whether a crypto buy or sell quote is c
 
 ## Install in Chrome
 
-1. Extract `prisme-chrome-v1.2.0.zip`, or build from source as shown below.
+1. Extract `prisme-chrome-v1.2.1.zip`, or build from source as shown below.
 2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
 3. Select the folder containing `manifest.json`. Select `dist/` when using a local build.
 4. Open Prisme and enter the applicable market-order fee for the reference venue under **Paramètres**. Enter the percentage for your account and pair.
