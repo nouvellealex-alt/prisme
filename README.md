@@ -10,7 +10,26 @@ Prisme est une extension Chrome qui répond à une question simple avant un acha
 flowchart TD
     A["Devis d’achat ou de vente"] --> B["Lecture Kraken ou saisie manuelle"]
     B --> C{"Comparer avec"}
-    C -->|Kraken Pro| Source du devis | Mode |
+    C -->|Kraken Pro| F["Même paire, même quantité, frais estimés"]
+    C -->|Binance Spot| F
+    C -->|Coinbase Exchange| F
+    F --> G{"Données suffisantes ?"}
+    G -->|Oui| H["Total de référence et écart estimés"]
+    G -->|Non| I["Comparaison indisponible"]
+```
+
+## Installation dans Chrome
+
+1. Téléchargez et décompressez le [ZIP de la dernière version](https://github.com/nouvellealex-alt/prisme/releases/latest).
+2. Ouvrez `chrome://extensions`, activez le **Mode développeur** et choisissez **Charger l’extension non empaquetée**.
+3. Sélectionnez le dossier contenant `manifest.json`.
+4. Renseignez vos frais taker dans **Paramètres**, puis sélectionnez un marché dans **Comparer avec**.
+
+## Utilisation
+
+Saisissez le total à payer pour un achat ou le montant net à recevoir pour une vente. Vous pouvez indiquer séparément les frais déjà compris dans ce total.
+
+| Source du devis | Mode |
 | --- | --- |
 | Kraken et Kraken Pro | Lecture automatique des récapitulatifs reconnus ou saisie manuelle |
 | Binance, Coinbase et autres plateformes | Saisie manuelle du total final |
