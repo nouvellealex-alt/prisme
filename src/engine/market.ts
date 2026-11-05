@@ -4,13 +4,10 @@ export const BOOK_MAX_AGE_MS = 12_000;
 export const CLOCK_SKEW_MS = 2_000;
 
 const KRAKEN_API = 'https://api.kraken.com/0/public/';
-const COINBASE_API = 'https://api.exchange.coinbase.com/products/';
-const COINBASE_BASES = new Set(['BTC', 'ETH', 'SOL']);
-const COINBASE_QUOTES = new Set(['EUR', 'USD', 'GBP']);
 const UNIT = 10n ** BigInt(INPUT_DECIMALS);
 const KRAKEN_SPREAD_LIMIT = UNIT * 25n / 1000n;
 
-export type Reference = 'Kraken Pro' | 'Coinbase Exchange';
+export type Reference = 'Kraken Pro';
 export type MarketError = 'unsupported-pair' | 'market-unavailable' | 'order-size'
   | 'insufficient-depth' | 'stale-book' | 'network-error';
 
@@ -27,10 +24,7 @@ export type Market = {
   asks: Level[];
   snapshotAt: number;
   minCost: bigint;
-} & (
-  { reference: 'Kraken Pro' }
-  | { reference: 'Coinbase Exchange'; slippageLimit: bigint }
-);
+};
 
 type RequestContext = { fetch: typeof fetch; now: () => number };
 
@@ -116,7 +110,7 @@ function parseBook(book: JsonObject, snapshotAt: number, context: RequestContext
   return { bids, asks, snapshotAt };
 }
 
-async function krakenMarket(
+export async function loadMarket(
   context: RequestContext,
   base: string,
   quote: string,
@@ -152,57 +146,17 @@ async function krakenMarket(
   // Kraken's per-level timestamps describe resting levels, so the HTTP date is the snapshot freshness proxy.
   return {
     ...parseBook(object(krakenResult(depth.body)[pairId]), snapshotAt, context),
-    reference: 'Kraken Pro',
     minCost,
   };
-}
-
-async function coinbaseMarket(
-  context: RequestContext,
-  base: string,
-  quote: string,
-  quantity: bigint,
-): Promise<Market> {
-  if (!COINBASE_BASES.has(base) || !COINBASE_QUOTES.has(quote)) fail('unsupported-pair');
-
-  const pair = base + '-' + quote;
-  const url = COINBASE_API + pair;
-  const { body: info } = await request(context, url, true);
-  if (info.id !== pair || info.base_currency !== base || info.quote_currency !== quote) fail('unsupported-pair');
-  if (info.status !== 'online' || info.post_only !== false || info.limit_only !== false || info.cancel_only !== false
-    || info.auction_mode !== false || info.trading_disabled === true) fail('market-unavailable');
-
-  const minCost = parseDecimal(info.min_market_funds);
-  const increment = parseDecimal(info.base_increment);
-  const slippageLimit = parseDecimal(info.max_slippage_percentage);
-  if (minCost === undefined || !increment || !slippageLimit || slippageLimit >= UNIT) fail('market-unavailable');
-  if (quantity % increment !== 0n) fail('order-size');
-
-  const { body: book } = await request(context, url + '/book?level=2', true);
-  if (book.auction_mode === true) fail('market-unavailable');
-  const snapshotAt = typeof book.time === 'string' ? Date.parse(book.time) : NaN;
-  return { ...parseBook(book, snapshotAt, context), reference: 'Coinbase Exchange', minCost, slippageLimit };
-}
-
-export function loadMarket(reference: Reference, context: RequestContext, base: string, quote: string, quantity: bigint) {
-  return reference === 'Kraken Pro' ? krakenMarket(context, base, quote, quantity)
-    : coinbaseMarket(context, base, quote, quantity);
 }
 
 function checkPriceProtection(market: Market, side: 'buy' | 'sell', worstPrice: bigint) {
   const bid = market.bids[0].price;
   const ask = market.asks[0].price;
-  if (market.reference === 'Kraken Pro') {
-    const low = side === 'buy' ? bid : worstPrice;
-    const high = side === 'buy' ? worstPrice : ask;
-    // The venue's lowest published market protection across spot pairs is 2.5%.
-    if ((high - low) * 2n * UNIT >= (high + low) * KRAKEN_SPREAD_LIMIT) fail('insufficient-depth');
-  } else {
-    // Coinbase Exchange measures price protection from the book's original midpoint.
-    const doubledMidpoint = bid + ask;
-    const distance = side === 'buy' ? worstPrice * 2n - doubledMidpoint : doubledMidpoint - worstPrice * 2n;
-    if (distance * UNIT > doubledMidpoint * market.slippageLimit) fail('insufficient-depth');
-  }
+  const low = side === 'buy' ? bid : worstPrice;
+  const high = side === 'buy' ? worstPrice : ask;
+  // The venue's lowest published market protection across spot pairs is 2.5%.
+  if ((high - low) * 2n * UNIT >= (high + low) * KRAKEN_SPREAD_LIMIT) fail('insufficient-depth');
 }
 
 export function fillMarket(market: Market, side: 'buy' | 'sell', quantity: bigint, feeBps: number) {

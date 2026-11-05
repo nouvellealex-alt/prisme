@@ -43,29 +43,6 @@ function krakenResponses(options: {
     ));
 }
 
-const coinbasePair = {
-  id: 'BTC-EUR',
-  base_currency: 'BTC',
-  quote_currency: 'EUR',
-  status: 'online',
-  post_only: false,
-  limit_only: false,
-  cancel_only: false,
-  auction_mode: false,
-  min_market_funds: '1',
-  base_increment: '0.00000001',
-  max_slippage_percentage: '0.05',
-};
-
-function coinbaseResponses(
-  pair: Partial<typeof coinbasePair> = {},
-  book: Partial<typeof krakenBook & { time: string; auction_mode: boolean }> = {},
-) {
-  return vi.fn<typeof fetch>()
-    .mockResolvedValueOnce(Response.json({ ...coinbasePair, ...pair }))
-    .mockResolvedValueOnce(Response.json({ ...krakenBook, time: new Date(now).toISOString(), ...book }));
-}
-
 describe('compareTransaction', () => {
   it('uses exact quantities across buy levels and adds the configured fee', async () => {
     const fetch = krakenResponses();
@@ -92,19 +69,19 @@ describe('compareTransaction', () => {
   });
 
   it('uses bids and subtracts fees when selling on the reference market', async () => {
-    const fetch = coinbaseResponses();
-    const order: Transaction = { ...source, platform: 'kraken-pro', side: 'sell', total: '95' };
-    const result = await compareTransaction(order, { coinbaseTakerBps: 100 }, { fetch, now: () => now });
+    const fetch = krakenResponses({ book: { bids: [['98.6', '0.5', 1], ['98.2', '4', 1]] } });
+    const order: Transaction = { ...source, platform: 'kraken-pro', side: 'sell', total: '99' };
+    const result = await compareTransaction(order, { krakenTakerBps: 100 }, { fetch, now: () => now });
     expect(result).toMatchObject({
-      status: 'better',
-      reference: 'Coinbase Exchange',
-      referenceGross: '97',
-      referenceFee: '0.97',
-      referenceTotal: '96.03',
-      savings: '1.03',
+      status: 'good',
+      reference: 'Kraken Pro',
+      referenceGross: '98.4',
+      referenceFee: '0.984',
+      referenceTotal: '97.416',
+      savings: '0',
     });
     expect(fetch).toHaveBeenNthCalledWith(
-      2, 'https://api.exchange.coinbase.com/products/BTC-EUR/book?level=2', expect.any(Object),
+      2, 'https://api.kraken.com/0/public/Depth?pair=XXBTZEUR&count=100', expect.any(Object),
     );
   });
 
@@ -150,10 +127,6 @@ describe('compareTransaction', () => {
       await expect(compareTransaction(source, { krakenTakerBps: 80 }, { fetch, now: () => now }))
         .resolves.toMatchObject({ reason: 'stale-book' });
     }
-    const oldCoinbase = coinbaseResponses({}, { time: new Date(now - 60_000).toISOString() });
-    await expect(compareTransaction(
-      { ...source, platform: 'kraken-pro' }, { coinbaseTakerBps: 60 }, { fetch: oldCoinbase, now: () => now },
-    )).resolves.toMatchObject({ reason: 'stale-book' });
   });
 
   it('excludes crypto conversions and FX pairs before fetching a reference', async () => {
@@ -189,20 +162,6 @@ describe('compareTransaction', () => {
       await expect(compareTransaction(order, { krakenTakerBps: 80 }, { fetch, now: () => now }))
         .resolves.toMatchObject({ status: 'unavailable', reason });
     }
-  });
-
-  it('refuses unknown cross-venue token identity, auction markets and excessive slippage', async () => {
-    const order: Transaction = { ...source, platform: 'kraken-pro' };
-    const noPair = coinbaseResponses();
-    const check = (fetch: typeof globalThis.fetch, tx = order) =>
-      compareTransaction(tx, { coinbaseTakerBps: 60 }, { fetch, now: () => now });
-    await expect(check(noPair, { ...order, base: 'DOGE' })).resolves.toMatchObject({ reason: 'unsupported-pair' });
-    expect(noPair).not.toHaveBeenCalled();
-    await expect(check(coinbaseResponses({ auction_mode: true }))).resolves.toMatchObject({ reason: 'market-unavailable' });
-    await expect(check(coinbaseResponses({ min_market_funds: '150' }))).resolves.toMatchObject({ reason: 'order-size' });
-    await expect(check(coinbaseResponses({ max_slippage_percentage: '0.01' }))).resolves.toMatchObject({
-      reason: 'insufficient-depth',
-    });
   });
 
   it('reports network errors without falling back to estimated or fabricated prices', async () => {

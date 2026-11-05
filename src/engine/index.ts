@@ -32,7 +32,6 @@ export type Transaction = {
 
 export type ComparisonSettings = {
   krakenTakerBps?: number;
-  coinbaseTakerBps?: number;
 };
 
 export type UnavailableReason = MarketError | 'invalid-transaction' | 'stale-transaction' | 'fee-not-configured';
@@ -103,18 +102,18 @@ export async function compareTransaction(
   const unavailable = (reason: UnavailableReason): Comparison => ({ status: 'unavailable', reason, checkedAt: now() });
   const order = parseTransaction(transaction);
   if (!order) return unavailable('invalid-transaction');
-  const { platform, side, base, quote, quantity, total, observedAt } = order;
+  const { side, base, quote, quantity, total, observedAt } = order;
   const expiresAt = observedAt + TRANSACTION_MAX_AGE_MS;
   if (now() >= expiresAt || observedAt > now() + CLOCK_SKEW_MS) return unavailable('stale-transaction');
   if (FIAT.has(base) || !FIAT.has(quote)) return unavailable('unsupported-pair');
 
-  const reference = platform === 'kraken' ? 'Kraken Pro' : 'Coinbase Exchange';
-  const feeBps = reference === 'Kraken Pro' ? settings.krakenTakerBps : settings.coinbaseTakerBps;
+  const reference = 'Kraken Pro';
+  const feeBps = settings.krakenTakerBps;
   if (!isFeeBps(feeBps)) return unavailable('fee-not-configured');
 
   try {
     const fetch = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
-    const market = await loadMarket(reference, { fetch, now }, base, quote, quantity);
+    const market = await loadMarket({ fetch, now }, base, quote, quantity);
     const fill = fillMarket(market, side, quantity, feeBps);
     const checkedAt = now();
     if (checkedAt >= expiresAt) return unavailable('stale-transaction');

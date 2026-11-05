@@ -5,7 +5,6 @@ export type Theme = 'auto' | 'light' | 'dark';
 
 export interface Settings {
   krakenTakerBps?: number;
-  coinbaseTakerBps?: number;
   theme: Theme;
   inlineEnabled: boolean;
 }
@@ -46,10 +45,7 @@ export function parseSettings(value: unknown): Settings {
     theme: input.theme === 'light' || input.theme === 'dark' ? input.theme : 'auto',
     inlineEnabled: typeof input.inlineEnabled === 'boolean' ? input.inlineEnabled : DEFAULT_SETTINGS.inlineEnabled,
   };
-  for (const key of ['krakenTakerBps', 'coinbaseTakerBps'] as const) {
-    const bps = input[key];
-    if (isFeeBps(bps)) settings[key] = bps;
-  }
+  if (isFeeBps(input.krakenTakerBps)) settings.krakenTakerBps = input.krakenTakerBps;
   return settings;
 }
 

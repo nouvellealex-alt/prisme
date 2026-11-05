@@ -6,7 +6,7 @@ Prisme is a Chrome extension that checks whether a Kraken crypto buy or sell quo
 
 ## Install in Chrome
 
-1. Extract `prisme-chrome-v1.0.0.zip`, or build from source as shown below.
+1. Extract `prisme-chrome-v1.1.0.zip`, or build from source as shown below.
 2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
 3. Select the folder containing `manifest.json`. Select `dist/` when using a local build.
 4. Open Prisme and enter the applicable market-order fee for the reference venue under **Paramètres**. Enter the percentage for your account and pair.
@@ -18,7 +18,7 @@ Open Prisme on a spot buy or sell review screen. It attempts to read the exact q
 | Quote source | Comparison reference |
 | --- | --- |
 | Kraken | Kraken Pro market order estimated using the public Kraken Spot order book |
-| Kraken Pro | Coinbase Exchange market order on supported, identical fiat-quoted pairs |
+| Kraken Pro | Estimate on the same Kraken Spot market |
 
 **Bon prix** means the quoted amount is close to or more favorable than the reference after fees. Any potential saving is an estimate from a snapshot of the order book and can change before execution. It describes one reference market and assumes that you can access it and have the necessary funds in the quoted currency.
 
@@ -46,8 +46,7 @@ The detector supports recognized, explicit review layouts. Authenticated Kraken 
 ## Roadmap
 
 1. Expand Kraken and Kraken Pro detection using anonymized review fixtures in multiple languages and layouts.
-2. Add Coinbase page detection. Coinbase Exchange already provides public reference data for selected pairs.
 3. Add Binance after verifying regional availability, symbol identity, order constraints and fees.
 4. Evaluate Uniswap separately with on-chain quotes, gas and liquidity checks.
 
-Independent project. No affiliation with Kraken, Coinbase or Google.
+Independent project. No affiliation with Kraken or Google.

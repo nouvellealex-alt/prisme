@@ -11,19 +11,18 @@ flowchart TD
     A["Devis d’achat ou de vente sur Kraken ou Kraken Pro"] --> B["Prisme lit le récapitulatif, ou tu saisis le devis"]
     B --> C{"D’où vient le devis ?"}
     C -->|Kraken| D["Carnet public Kraken Pro"]
-    C -->|Kraken Pro| E["Carnet Coinbase Exchange · paires compatibles"]
+    C -->|Kraken Pro| D
     D --> F["Même quantité, même devise · frais estimés inclus"]
-    E --> F
     F --> G{"Données suffisantes ?"}
     G -->|Oui| H["Bon prix ou économie potentielle"]
     G -->|Non| I["Comparaison indisponible"]
 ```
 
-Coinbase Exchange sert de référence de prix pour certains devis Kraken Pro. La détection automatique est disponible sur les pages Kraken et Kraken Pro reconnues.
+Les deux interfaces utilisent le carnet Spot public de Kraken. Pour Kraken Pro, le résultat compare le devis à une estimation sur le même marché.
 
 ## Installation dans Chrome
 
-1. Décompressez `prisme-chrome-v1.0.0.zip`. Vous pouvez aussi compiler le projet avec les commandes ci-dessous.
+1. Décompressez `prisme-chrome-v1.1.0.zip`. Vous pouvez aussi compiler le projet avec les commandes ci-dessous.
 2. Ouvrez `chrome://extensions`, activez le **Mode développeur**, puis cliquez sur **Charger l’extension non empaquetée**.
 3. Sélectionnez le dossier contenant `manifest.json`. Pour une compilation locale, sélectionnez `dist/`.
 4. Ouvrez Prisme et indiquez dans **Paramètres** le taux de frais de l’ordre au marché pour la plateforme de référence. Utilisez le taux applicable à votre compte et à la paire, en pourcentage.
@@ -35,7 +34,7 @@ Ouvrez Prisme sur l’aperçu d’un achat ou d’une vente au comptant. L’ext
 | Devis | Référence du calcul |
 | --- | --- |
 | Kraken | Ordre au marché sur Kraken Pro, à partir du carnet Spot public de Kraken |
-| Kraken Pro | Ordre au marché sur Coinbase Exchange pour une sélection de paires à devises identiques |
+| Kraken Pro | Estimation sur le même marché Spot Kraken |
 
 **Bon prix** signifie que le prix proposé est au moins aussi favorable que la référence ou reste proche du total de référence après frais. Une économie éventuelle est une estimation calculée à partir du carnet, susceptible d’évoluer avant exécution. La référence indique une seule plateforme et dépend de l’accès au marché et aux fonds dans la devise affichée.
 
@@ -67,8 +66,7 @@ Le détecteur couvre des récapitulatifs explicites. Les variantes authentifiée
 ## Feuille de route
 
 1. Élargir la couverture Kraken et Kraken Pro à partir de récapitulatifs anonymisés, dans plusieurs langues et mises en page.
-2. Ajouter la détection côté Coinbase. Coinbase Exchange sert déjà de source publique pour certaines paires, indépendamment de la détection.
 3. Ajouter Binance en validant les symboles, restrictions régionales, règles de quantité et frais de chaque marché.
 4. Étudier Uniswap avec des contrôles spécifiques aux devis on-chain, au gaz et à la liquidité.
 
-Projet indépendant de Kraken, Coinbase et Google.
+Projet indépendant de Kraken et Google.

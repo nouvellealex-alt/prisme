@@ -110,10 +110,8 @@ export function SettingsForm({ settings, onSave }: {
     const form = new FormData(event.currentTarget);
     const theme = form.get('theme');
     const kraken = String(form.get('krakenFee') ?? '').trim();
-    const coinbase = String(form.get('coinbaseFee') ?? '').trim();
     const krakenTakerBps = bps(kraken);
-    const coinbaseTakerBps = bps(coinbase);
-    if ((kraken && krakenTakerBps === undefined) || (coinbase && coinbaseTakerBps === undefined)) {
+    if (kraken && krakenTakerBps === undefined) {
       setError('Saisissez un taux entre 0 et 10 %, avec au maximum deux décimales.');
       return;
     }
@@ -124,7 +122,6 @@ export function SettingsForm({ settings, onSave }: {
         theme: theme === 'light' || theme === 'dark' ? theme : 'auto',
         inlineEnabled: form.has('inline'),
         krakenTakerBps,
-        coinbaseTakerBps,
       });
     } catch {
       setError('Les paramètres n’ont pas été enregistrés. Réessayez.');
@@ -137,11 +134,7 @@ export function SettingsForm({ settings, onSave }: {
     <div className="form-row">
       <label className="field">Kraken Pro (%)
         <input name="krakenFee" inputMode="decimal" maxLength={6} autoComplete="off" defaultValue={feePercent(settings.krakenTakerBps)} />
-        <span className="hint">Pour les devis Kraken.</span>
-      </label>
-      <label className="field">Coinbase Exchange (%)
-        <input name="coinbaseFee" inputMode="decimal" maxLength={6} autoComplete="off" defaultValue={feePercent(settings.coinbaseTakerBps)} />
-        <span className="hint">Pour les devis Kraken Pro.</span>
+        <span className="hint">Pour les devis Kraken et Kraken Pro.</span>
       </label>
     </div>
     <label className="field">Apparence

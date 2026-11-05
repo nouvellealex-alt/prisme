@@ -135,7 +135,7 @@ function Method() {
   return <div className="method-list">
     <article><h2>Même transaction</h2><p>Prisme compare le total final du devis avec le prix d’un ordre au marché de même sens, quantité et paire. Les deux totaux utilisent la même devise.</p></article>
     <article><h2>Prix disponible au carnet</h2><p>Le calcul parcourt les niveaux d’achat ou de vente jusqu’à couvrir la quantité. Les frais estimés sont ajoutés à un achat et déduits d’une vente.</p></article>
-    <article><h2>Sources de référence</h2><p>Le carnet public Kraken Pro sert pour les devis Kraken. Le carnet public Coinbase Exchange sert pour les devis Kraken Pro, sur les paires communes.</p></article>
+    <article><h2>Sources de référence</h2><p>Les devis Kraken et Kraken Pro sont comparés au carnet Spot public de Kraken. Pour un devis Kraken Pro, le résultat mesure l’écart avec une estimation sur le même marché.</p></article>
     <article><h2>Fonds et coûts annexes</h2><p>Le calcul suppose des fonds disponibles dans la même devise sur les deux plateformes. Il exclut les conversions, les transferts et les retraits.</p></article>
   </div>;
 }
