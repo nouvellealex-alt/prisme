@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="615" viewBox="0 0 1200 615" role="img" aria-labelledby="title description">
+  <title id="title">Trois propositions visuelles pour Prisme</title>
+  <desc id="description">Carte de verdict, verdict typographique et reçu comparatif, avec les mêmes données fictives. La carte de verdict est retenue.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #1d1d1f }
+      .note { font-size: 14px; fill: #595b64 }
+      .heading { font-size: 18px; font-weight: 720 }
+      .brand { font-size: 17px; font-weight: 700; letter-spacing: -.45px }
+      .value { font-size: 39px; font-weight: 750; letter-spacing: -1.5px }
+      .label { font-size: 13px; font-weight: 650; fill: #005ec4 }
+      .row { font-size: 13px; fill: #595b64 }
+      .number { font-size: 13px; font-weight: 650; text-anchor: end }
+      .button-label { fill: #fff; font-size: 13px; font-weight: 650; text-anchor: middle }
+      .tiny { font-size: 11px; fill: #595b64 }
+      .rule { stroke: #e4e4e9 }
+    </style>
+    <symbol id="brand" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="10" fill="#204b81"/>
+      <g fill="none" stroke="#fff" stroke-width="1.45" stroke-linejoin="round">
+        <path d="M16 7l8 4.6v8.8L16 25l-8-4.6v-8.8z"/>
+        <path d="m8 11.6 8 4.6 8-4.6M16 16.2V25m0-18v5m0 0-4.4 2.6M16 12l4.4 2.6"/>
+      </g>
+    </symbol>
+    <symbol id="popup-header" viewBox="0 0 300 32">
+      <use href="#brand" width="32" height="32"/>
+      <text class="brand" x="41" y="22">Prisme</text>
+      <circle cx="172" cy="16" r="3" fill="#197035"/>
+      <text class="tiny" x="181" y="20">Référence reçue</text>
+      <rect x="268" width="32" height="32" rx="9" fill="#f5f5f7"/>
+      <circle cx="284" cy="16" r="6" fill="none" stroke="#595b64" stroke-width="1.4"/>
+      <circle cx="284" cy="16" r="2" fill="none" stroke="#595b64" stroke-width="1.4"/>
+      <path d="M284 7v3m0 12v3m-9-9h3m12 0h3" stroke="#595b64" stroke-width="1.4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="pair-summary" viewBox="0 0 300 99">
+      <rect x=".5" y=".5" width="299" height="98" rx="12" fill="#fff" class="rule"/>
+      <path d="M11 25h278M11 49h278M11 73h278" class="rule"/>
+      <text class="row" x="11" y="17">Paire</text><text class="number" x="289" y="17">BTC / EUR</text>
+      <text class="row" x="11" y="41">Plateforme</text><text class="number" x="289" y="41">Kraken</text>
+      <text class="row" x="11" y="65">Total à payer</text><text class="number" x="289" y="65">120,00 €</text>
+      <text class="row" x="11" y="89">Dernière vérification</text><text class="number" x="289" y="89">14:32:05</text>
+    </symbol>
+    <symbol id="action" viewBox="0 0 300 58">
+      <rect width="300" height="34" rx="9" fill="#1d1d1f"/>
+      <text class="button-label" x="150" y="22">Voir la comparaison  ›</text>
+      <text class="label" x="150" y="55" text-anchor="middle">Comment est-ce calculé ?</text>
+    </symbol>
+  </defs>
+  <rect width="1200" height="615" rx="20" fill="#f4f5f8"/>
+  <text x="35" y="55" font-size="32" font-weight="740" letter-spacing="-1">Prisme</text>
+  <text class="note" x="35" y="81">Études du popup · exemple fictif</text>
+  <g transform="translate(35 130)">
+    <text class="heading" y="0">01 · Carte de verdict</text>
+    <rect x="243" y="-17" width="87" height="23" rx="11.5" fill="#dce9ff"/>
+    <text class="label" x="286.5" y="-1" text-anchor="middle">Retenue</text>
+    <rect x=".5" y="21.5" width="329" height="395" rx="19" fill="#fff" stroke="#c9d7ef"/>
+    <use href="#popup-header" x="15" y="37" width="300" height="32"/>
+    <rect x="15" y="85" width="300" height="122" rx="14" fill="#e9f2ff"/>
+    <text class="label" x="29" y="110">✧  Économie possible</text>
+    <text class="value" x="29" y="151">8,40 €</text>
+    <text class="row" x="29" y="176">Une offre comparable semble plus</text>
+    <text class="row" x="29" y="193">avantageuse, frais estimés inclus.</text>
+    <use href="#pair-summary" x="15" y="219" width="300" height="99"/>
+    <use href="#action" x="15" y="331" width="300" height="58"/>
+  </g>
+  <g transform="translate(435 130)">
+    <text class="heading" y="0">02 · Verdict typographique</text>
+    <rect x=".5" y="21.5" width="329" height="395" rx="19" fill="#fff" stroke="#dcdde4"/>
+    <use href="#popup-header" x="15" y="37" width="300" height="32"/>
+    <g text-anchor="middle">
+      <text class="label" x="165" y="110">Économie possible</text>
+      <text class="value" x="165" y="154">8,40 €</text>
+      <text class="row" x="165" y="180">Une offre comparable semble plus</text>
+      <text class="row" x="165" y="196">avantageuse, frais estimés inclus.</text>
+    </g>
+    <use href="#pair-summary" x="15" y="219" width="300" height="99"/>
+    <use href="#action" x="15" y="331" width="300" height="58"/>
+  </g>
+  <g transform="translate(835 130)">
+    <text class="heading" y="0">03 · Reçu comparatif</text>
+    <rect x=".5" y="21.5" width="329" height="395" rx="19" fill="#fff" stroke="#dcdde4"/>
+    <use href="#popup-header" x="15" y="37" width="300" height="32"/>
+    <rect x="15" y="85" width="300" height="122" rx="14" fill="#f5f5f7"/>
+    <text class="row" x="29" y="110">Votre devis · Kraken</text><text class="number" x="302" y="110">120,00 €</text>
+    <path d="M29 122h273M29 153h273" class="rule"/>
+    <text class="row" x="29" y="141">Référence · Kraken Pro</text><text class="number" x="302" y="141">111,60 €</text>
+    <text class="label" x="29" y="179">Économie possible</text>
+    <text x="302" y="183" text-anchor="end" font-size="25" font-weight="750" fill="#005ec4">8,40 €</text>
+    <text class="tiny" x="29" y="196">Frais estimés inclus</text>
+    <use href="#pair-summary" x="15" y="219" width="300" height="99"/>
+    <use href="#action" x="15" y="331" width="300" height="58"/>
+  </g>
+  <text class="note" x="35" y="585">Même contenu, trois hiérarchies. La carte réserve une place stable à chaque verdict.</text>
+</svg>
